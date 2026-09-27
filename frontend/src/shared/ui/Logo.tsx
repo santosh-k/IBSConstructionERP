@@ -58,9 +58,9 @@ export function Logo({ size = 'md', animate = false, className }: LogoProps) {
       <svg viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-full h-full">
         <defs>
           <linearGradient id={gradientId} x1="0%" y1="0%" x2="100%" y2="100%">
-            <stop offset="0%" stopColor="#0284c7" />
-            <stop offset="55%" stopColor="#0ea5e9" />
-            <stop offset="100%" stopColor="#ea580c" />
+            <stop offset="0%" stopColor="#0B3A6E" />
+            <stop offset="55%" stopColor="#0d457f" />
+            <stop offset="100%" stopColor="#E87722" />
           </linearGradient>
         </defs>
 
@@ -124,10 +124,19 @@ function BrandWordmark({
 }: BrandWordmarkOptions) {
   const name = getAppDisplayName();
 
+  if (name.includes('PWD Delhi') || name.startsWith('PWD')) {
+    return (
+      <>
+        <span className="text-[#0B3A6E]">PWD Delhi</span>
+        <span className="text-content-tertiary font-semibold text-[0.85em]"> · Works</span>
+      </>
+    );
+  }
+
   if (name === 'CivilCore') {
     return (
       <>
-        Civil<span className="text-orange-500">Core</span>
+        Civil<span className="text-[#E87722]">Core</span>
       </>
     );
   }

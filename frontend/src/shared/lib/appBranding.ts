@@ -1,10 +1,19 @@
 /** Product branding — override via Vite env (repo root `.env`). */
 
+import { isCivilCoreDemo } from './civilcoreDemo';
+
 export const DEFAULT_APP_NAME = 'CivilCore';
+
+/** PWD Delhi Works Estimating face (Planning + Engineer — not citizen Sewa). */
+export const PWD_DELHI_APP_NAME = 'PWD Delhi — Works Estimating';
+export const PWD_DELHI_APP_NAME_HI = 'लोक निर्माण विभाग — लागत अनुमान';
+export const PWD_DELHI_SHORT_NAME = 'PWD Delhi';
+export const PWD_DELHI_TAGLINE =
+  'Planning & Engineer works cost calculator · NCT of Delhi';
 
 const UPSTREAM_GITHUB = 'https://github.com/datadrivenconstruction/OpenConstructionERP';
 const DEFAULT_GITHUB =
-  'https://github.com/CNIT-Organization/IBSConstructionERP';
+  'https://github.com/santosh-k/IBSConstructionERP';
 
 function envString(key: keyof ImportMetaEnv): string | undefined {
   const raw = import.meta.env[key];
@@ -15,19 +24,33 @@ function envString(key: keyof ImportMetaEnv): string | undefined {
 
 /** Display name for browser title, sidebar, login, reports. */
 export function getAppDisplayName(): string {
-  return envString('VITE_APP_NAME') ?? DEFAULT_APP_NAME;
+  const fromEnv = envString('VITE_APP_NAME');
+  if (fromEnv) return fromEnv;
+  if (isCivilCoreDemo()) return PWD_DELHI_APP_NAME;
+  return DEFAULT_APP_NAME;
 }
 
-/** Short label for meta tags (e.g. application-name). */
+/** Short label for meta tags / compact chrome. */
 export function getAppShortName(): string {
-  return envString('VITE_APP_SHORT_NAME') ?? 'CivilCore';
+  const fromEnv = envString('VITE_APP_SHORT_NAME');
+  if (fromEnv) return fromEnv;
+  if (isCivilCoreDemo()) return PWD_DELHI_SHORT_NAME;
+  return 'CivilCore';
 }
 
 export function getAppTagline(): string {
-  return (
-    envString('VITE_APP_TAGLINE') ??
-    'Construction cost estimation & project control'
-  );
+  const fromEnv = envString('VITE_APP_TAGLINE');
+  if (fromEnv) return fromEnv;
+  if (isCivilCoreDemo()) return PWD_DELHI_TAGLINE;
+  return 'Construction cost estimation & project control';
+}
+
+/** Hindi product line for login / shell (empty when not PWD demo). */
+export function getAppDisplayNameHi(): string {
+  if (isCivilCoreDemo() || envString('VITE_APP_NAME')?.includes('PWD')) {
+    return envString('VITE_APP_NAME_HI') ?? PWD_DELHI_APP_NAME_HI;
+  }
+  return '';
 }
 
 /** Public marketing site (optional). Falls back to GitHub repo when unset. */
@@ -45,7 +68,7 @@ export function getUpstreamGithubUrl(): string {
 
 /** Hidden integrity / attribution line (AGPL upstream). */
 export function getBuildAttributionLine(): string {
-  const name = getAppDisplayName();
+  const name = getAppShortName();
   return `DataDrivenConstruction·CWICR·${name}·2026`;
 }
 
