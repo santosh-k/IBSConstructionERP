@@ -3,10 +3,18 @@
  * Seeds demo Delhi works; merges optional BOQ-derived rows when API is available.
  */
 
-import type { EstimateRegisterItem, EstimateStage, PEWizardState } from './types';
+import type {
+  DEEditorState,
+  DELine,
+  EstimateRegisterItem,
+  EstimateStage,
+  PEWizardState,
+} from './types';
 import { computeAbstract } from './peCompute';
+import { computeDEAbstract } from './deCompute';
+import { DEMO_DSR_CATALOG } from './demoDSR';
 
-const STORAGE_KEY = 'pwd_delhi_estimate_register_v1';
+const STORAGE_KEY = 'pwd_delhi_estimate_register_v2';
 
 function nowIso(): string {
   return new Date().toISOString();
@@ -35,6 +43,44 @@ export function createEmptyPEWizard(partial?: Partial<PEWizardState>): PEWizardS
   };
 }
 
+export function createEmptyDE(
+  partial?: Partial<DEEditorState> & { lines?: DELine[] },
+): DEEditorState {
+  return {
+    id: partial?.id ?? uid('de'),
+    workName: partial?.workName ?? '',
+    projectName: partial?.projectName ?? '',
+    contingencyPct: partial?.contingencyPct ?? 3,
+    lines: partial?.lines ?? [],
+    stage: partial?.stage ?? 'de',
+    updatedAt: partial?.updatedAt ?? nowIso(),
+  };
+}
+
+function seedDemoDELines(): DELine[] {
+  const pick = (code: string, qty: number): DELine | null => {
+    const item = DEMO_DSR_CATALOG.find((d) => d.code === code);
+    if (!item) return null;
+    return {
+      id: uid('dl'),
+      code: item.code,
+      description: item.description,
+      unit: item.unit,
+      qty,
+      rate: item.rate,
+      isNS: false,
+      nsAnalysis: null,
+    };
+  };
+  return [
+    pick('16.1', 12_500),
+    pick('16.3.1', 1_850),
+    pick('16.31.1.1', 12_500),
+    pick('16.40.1', 625),
+    pick('16.57.1', 500),
+  ].filter(Boolean) as DELine[];
+}
+
 function seedDemoRows(): EstimateRegisterItem[] {
   const pe = createEmptyPEWizard({
     id: 'pe-demo-school',
@@ -52,6 +98,16 @@ function seedDemoRows(): EstimateRegisterItem[] {
   });
   const peAmount = computeAbstract(pe).estimatedCost;
 
+  const deRoad = createEmptyDE({
+    id: 'est-demo-de-road',
+    workName: 'Strengthening of MDR — Outer Ring Rd stretch',
+    projectName: 'Roads — South Circle',
+    contingencyPct: 3,
+    lines: seedDemoDELines(),
+    stage: 'de',
+  });
+  const deAmount = computeDEAbstract(deRoad).estimatedCost;
+
   const rows: EstimateRegisterItem[] = [
     {
       id: 'est-demo-rough-drain',
@@ -63,6 +119,7 @@ function seedDemoRows(): EstimateRegisterItem[] {
       amountInr: 1_85_00_000,
       updatedAt: nowIso(),
       peDraft: null,
+      deDraft: null,
     },
     {
       id: pe.id,
@@ -74,6 +131,7 @@ function seedDemoRows(): EstimateRegisterItem[] {
       amountInr: peAmount,
       updatedAt: pe.updatedAt,
       peDraft: pe,
+      deDraft: null,
     },
     {
       id: 'est-demo-aaes-hospital',
@@ -85,17 +143,19 @@ function seedDemoRows(): EstimateRegisterItem[] {
       amountInr: 12_40_00_000,
       updatedAt: nowIso(),
       peDraft: null,
+      deDraft: null,
     },
     {
-      id: 'est-demo-de-road',
-      name: 'Strengthening of MDR — Outer Ring Rd stretch',
+      id: deRoad.id,
+      name: deRoad.workName,
       workDescription: 'Detailed Estimate in progress (DSR)',
       projectId: null,
-      projectName: 'Roads — South Circle',
+      projectName: deRoad.projectName,
       stage: 'de',
-      amountInr: 8_75_50_000,
-      updatedAt: nowIso(),
+      amountInr: deAmount,
+      updatedAt: deRoad.updatedAt,
       peDraft: null,
+      deDraft: deRoad,
     },
     {
       id: 'est-demo-ts-bridge',
@@ -107,6 +167,7 @@ function seedDemoRows(): EstimateRegisterItem[] {
       amountInr: 5_20_00_000,
       updatedAt: nowIso(),
       peDraft: null,
+      deDraft: null,
     },
     {
       id: 'est-demo-nit-office',
@@ -118,6 +179,7 @@ function seedDemoRows(): EstimateRegisterItem[] {
       amountInr: 42_15_00_000,
       updatedAt: nowIso(),
       peDraft: null,
+      deDraft: null,
     },
   ];
   return rows;
@@ -166,6 +228,7 @@ export function getEstimateById(id: string): EstimateRegisterItem | undefined {
 export function savePEDraft(state: PEWizardState): EstimateRegisterItem {
   const abstract = computeAbstract(state);
   const updated: PEWizardState = { ...state, updatedAt: nowIso(), stage: 'pe' };
+  const existing = getEstimateById(updated.id);
   const item: EstimateRegisterItem = {
     id: updated.id,
     name: updated.workName || 'Untitled PE',
@@ -178,9 +241,52 @@ export function savePEDraft(state: PEWizardState): EstimateRegisterItem {
     amountInr: abstract.estimatedCost,
     updatedAt: updated.updatedAt,
     peDraft: updated,
+    deDraft: existing?.deDraft ?? null,
   };
   upsertEstimate(item);
   return item;
+}
+
+export function saveDEDraft(state: DEEditorState): EstimateRegisterItem {
+  const abstract = computeDEAbstract(state);
+  const updated: DEEditorState = { ...state, updatedAt: nowIso(), stage: 'de' };
+  const existing = getEstimateById(updated.id);
+  const item: EstimateRegisterItem = {
+    id: updated.id,
+    name: updated.workName || 'Untitled DE',
+    workDescription:
+      abstract.lineCount > 0
+        ? `DE — ${abstract.lineCount} DSR/NS line(s)`
+        : 'Detailed Estimate (DSR)',
+    projectId: existing?.projectId ?? null,
+    projectName: updated.projectName || existing?.projectName || '—',
+    stage: 'de' as EstimateStage,
+    amountInr: abstract.estimatedCost,
+    updatedAt: updated.updatedAt,
+    peDraft: existing?.peDraft ?? null,
+    deDraft: updated,
+    boqId: existing?.boqId,
+  };
+  upsertEstimate(item);
+  return item;
+}
+
+/** Advance an AA/ES (or earlier) row into DE stage with empty/skeleton draft. */
+export function advanceToDE(estimateId: string): EstimateRegisterItem | undefined {
+  const existing = getEstimateById(estimateId);
+  if (!existing) return undefined;
+  if (existing.deDraft) {
+    return saveDEDraft({ ...existing.deDraft, stage: 'de' });
+  }
+  const draft = createEmptyDE({
+    id: existing.id,
+    workName: existing.name,
+    projectName: existing.projectName,
+    contingencyPct: existing.peDraft?.contingencyPct ?? 3,
+    lines: [],
+    stage: 'de',
+  });
+  return saveDEDraft(draft);
 }
 
 /** Map BOQ status strings loosely onto estimate stages for optional merge. */

@@ -6,7 +6,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { FilePlus2, FolderOpen, Search, Table2 } from 'lucide-react';
+import { FilePlus2, FolderOpen, Search, Table2, ClipboardList } from 'lucide-react';
 import { Badge, Breadcrumb, Button, Card, EmptyState } from '@/shared/ui';
 import { apiGet } from '@/shared/lib/api';
 import { DateDisplay } from '@/shared/ui/DateDisplay';
@@ -17,7 +17,7 @@ import {
   type EstimateStage,
 } from './types';
 import { formatInr } from './peCompute';
-import { loadRegister, stageFromBoqStatus } from './estimateStore';
+import { advanceToDE, loadRegister, stageFromBoqStatus } from './estimateStore';
 
 interface ProjectRow {
   id: string;
@@ -145,8 +145,16 @@ export function EstimateRegisterPage() {
   }, [merged, stageFilter, search]);
 
   const openEstimate = (row: EstimateRegisterItem) => {
+    if (row.stage === 'de' || row.deDraft) {
+      navigate(`/estimates/${row.id}/de`);
+      return;
+    }
     if (row.peDraft || row.stage === 'pe' || row.stage === 'rough') {
       navigate(`/estimates/pe/${row.id}`);
+      return;
+    }
+    if (row.stage === 'aa_es') {
+      navigate(`/estimates/${row.id}/de`);
       return;
     }
     if (row.boqId) {
@@ -154,6 +162,14 @@ export function EstimateRegisterPage() {
       return;
     }
     navigate(`/estimates/pe/${row.id}`);
+  };
+
+  const openDE = (row: EstimateRegisterItem) => {
+    if (row.stage === 'aa_es' && !row.deDraft) {
+      advanceToDE(row.id);
+      refresh();
+    }
+    navigate(`/estimates/${row.id}/de`);
   };
 
   return (
@@ -182,6 +198,13 @@ export function EstimateRegisterPage() {
             onClick={() => navigate('/estimates/pe')}
           >
             New PE
+          </Button>
+          <Button
+            variant="secondary"
+            icon={<ClipboardList className="h-4 w-4" />}
+            onClick={() => navigate('/estimates/de')}
+          >
+            Open DE
           </Button>
           <Button variant="secondary" onClick={() => navigate('/boq')}>
             Open BOQ list
@@ -292,6 +315,17 @@ export function EstimateRegisterPage() {
                         <Button variant="secondary" size="sm" onClick={() => openEstimate(row)}>
                           Open
                         </Button>
+                        {(row.stage === 'de' ||
+                          row.stage === 'aa_es' ||
+                          row.deDraft) && (
+                          <Button
+                            variant="primary"
+                            size="sm"
+                            onClick={() => openDE(row)}
+                          >
+                            Open DE
+                          </Button>
+                        )}
                       </div>
                     </td>
                   </tr>
@@ -304,7 +338,7 @@ export function EstimateRegisterPage() {
 
       <p className="mt-4 text-xs text-content-tertiary">
         Demo register uses local storage; BOQ rows merge when the API is reachable.
-        Detailed Estimate (DE) editor lands in a later phase.
+        Open DE-stage rows for the Detailed Estimate (DSR) editor.
       </p>
     </div>
   );

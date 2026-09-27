@@ -41,6 +41,8 @@ export interface EstimateRegisterItem {
   /** Optional link to an existing BOQ if derived from list API */
   boqId?: string | null;
   peDraft?: PEWizardState | null;
+  /** Detailed Estimate draft (DSR lines + Abstract of Cost) */
+  deDraft?: DEEditorState | null;
 }
 
 export interface PEWizardState {
@@ -81,6 +83,56 @@ export interface AbstractOfCost {
   gstPct: number;
   gstAmount: number;
   totalWithGstInfo: number;
+}
+
+/** Demo / pack DSR schedule item (PWD Delhi SOR-style). */
+export interface DSRItem {
+  code: string;
+  description: string;
+  unit: string;
+  rate: number;
+  category: 'earthwork' | 'concrete' | 'masonry' | 'steel' | 'finishing' | 'road' | 'misc';
+}
+
+/** Simple NS (non-schedule) rate analysis stub. */
+export interface NSRateAnalysis {
+  labour: number;
+  material: number;
+  overhead: number;
+}
+
+export interface DELine {
+  id: string;
+  code: string;
+  description: string;
+  unit: string;
+  qty: number;
+  rate: number;
+  /** Non-schedule item with optional rate analysis */
+  isNS: boolean;
+  nsAnalysis?: NSRateAnalysis | null;
+}
+
+export interface DEEditorState {
+  id: string;
+  workName: string;
+  projectName: string;
+  contingencyPct: number;
+  lines: DELine[];
+  stage: EstimateStage;
+  updatedAt: string;
+}
+
+/** Abstract of Cost derived from DE schedule lines. */
+export interface DEAbstractOfCost {
+  worksTotal: number;
+  contingencyPct: number;
+  contingencyAmount: number;
+  estimatedCost: number;
+  gstPct: number;
+  gstAmount: number;
+  totalWithGstInfo: number;
+  lineCount: number;
 }
 
 export const GST_WORKS_PCT = 18;

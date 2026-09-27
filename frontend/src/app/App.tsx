@@ -5,7 +5,7 @@ import { DashboardPage } from '@/features/dashboard';
 import { LoginPage, LoginPageNext, PwdDelhiLoginPage, RegisterPage, ForgotPasswordPage } from '@/features/auth';
 import { ProjectsPage, CreateProjectPage, ProjectDetailPage, ProjectSettingsPage } from '@/features/projects';
 import { BOQListPage, CreateBOQPage, TemplatesPage } from '@/features/boq';
-import { EstimateRegisterPage, PEWizardPage } from '@/features/estimates';
+import { DEEditorPage, EstimateRegisterPage, PEWizardPage } from '@/features/estimates';
 import { syncCustomUnitsFromServer } from '@/features/boq/boqHelpers';
 import { CostsPage, ImportDatabasePage } from '@/features/costs';
 import { OnboardingWizard } from '@/features/onboarding';
@@ -629,11 +629,13 @@ export default function App() {
             day-works, instructions, time-impact analysis. */}
         <Route path="/variations" element={<P title="Variations"><VariationsPage /></P>} />
         <Route path="/projects/:projectId/variations" element={<P title="Variations"><VariationsPage /></P>} />
-        {/* PWD Phase A+: Estimate register + PE wizard (DE editor later). */}
+        {/* PWD Phase A+: Estimate register + PE wizard + DE editor. */}
         <Route path="/estimates" element={<P title="Estimate Register"><EstimateRegisterPage /></P>} />
         <Route path="/estimates/register" element={<P title="Estimate Register"><EstimateRegisterPage /></P>} />
         <Route path="/estimates/pe" element={<P title="Preliminary Estimate"><PEWizardPage /></P>} />
         <Route path="/estimates/pe/:estimateId" element={<P title="Preliminary Estimate"><PEWizardPage /></P>} />
+        <Route path="/estimates/de" element={<P title="Detailed Estimate"><DEEditorPage /></P>} />
+        <Route path="/estimates/:estimateId/de" element={<P title="Detailed Estimate"><DEEditorPage /></P>} />
         <Route path="/profile" element={<Navigate to="/settings" replace />} />
         <Route path="/notifications" element={<P title="Notifications"><NotificationsPage /></P>} />
 
