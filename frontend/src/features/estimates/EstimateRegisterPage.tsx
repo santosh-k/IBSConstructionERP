@@ -46,6 +46,10 @@ import {
   printSOQ,
   soqStateForRegisterItem,
 } from './estimateExport';
+import {
+  mergeBoqRowWithMetadata,
+  queueSyncEstimateToBoq,
+} from './estimateApiSync';
 
 interface ProjectRow {
   id: string;
@@ -61,6 +65,7 @@ interface BoqRow {
   grand_total?: number;
   updated_at?: string;
   created_at?: string;
+  metadata?: Record<string, unknown> | null;
 }
 
 function stageBadgeVariant(
@@ -122,20 +127,14 @@ export function EstimateRegisterPage() {
         projects!.slice(0, 12).map(async (p) => {
           try {
             const boqs = await apiGet<BoqRow[]>(`/v1/boq/boqs/?project_id=${p.id}`);
-            return boqs.map((b) => ({
-              id: `boq-${b.id}`,
-              name: b.name,
-              workDescription: b.description || 'From BOQ list',
-              projectId: b.project_id,
-              projectName: projectMap.get(b.project_id) || 'Project',
-              stage: stageFromBoqStatus(b.status),
-              amountInr: b.grand_total ?? 0,
-              updatedAt: b.updated_at || b.created_at || new Date().toISOString(),
-              boqId: b.id,
-              peDraft: null,
-              deDraft: null,
-              sanction: null,
-            })) as EstimateRegisterItem[];
+            return boqs.map((b) =>
+              mergeBoqRowWithMetadata(
+                b,
+                projectMap.get(b.project_id) || 'Project',
+                stageFromBoqStatus,
+                { persistHydrated: true },
+              ),
+            );
           } catch {
             return [] as EstimateRegisterItem[];
           }
@@ -146,6 +145,12 @@ export function EstimateRegisterPage() {
     staleTime: 60_000,
     retry: false,
   });
+
+  useEffect(() => {
+    if (boqDerived && boqDerived.length > 0) {
+      refresh();
+    }
+  }, [boqDerived, refresh]);
 
   const merged = useMemo(() => {
     const byId = new Map<string, EstimateRegisterItem>();
@@ -186,7 +191,8 @@ export function EstimateRegisterPage() {
 
   const openDE = (row: EstimateRegisterItem) => {
     if ((row.stage === 'aa_es' || row.stage === 'pe') && !row.deDraft) {
-      advanceToDE(row.id);
+      const advanced = advanceToDE(row.id);
+      queueSyncEstimateToBoq(advanced);
       refresh();
     }
     navigate(`/estimates/${row.id}/de`);
@@ -218,6 +224,7 @@ export function EstimateRegisterPage() {
     const nxt = nextStage(from);
     const updated = advanceEstimateStage(advanceTarget.id);
     setAdvanceTarget(null);
+    queueSyncEstimateToBoq(updated);
     refresh();
     if (updated && nxt) {
       addToast({
@@ -239,8 +246,9 @@ export function EstimateRegisterPage() {
 
   const saveSanction = () => {
     if (!sanctionTarget) return;
-    saveSanctionNotes(sanctionTarget.id, sanctionForm);
+    const saved = saveSanctionNotes(sanctionTarget.id, sanctionForm);
     setSanctionTarget(null);
+    queueSyncEstimateToBoq(saved);
     refresh();
     addToast({
       type: 'success',
@@ -524,10 +532,11 @@ export function EstimateRegisterPage() {
       </Card>
 
       <p className="mt-4 text-xs text-content-tertiary">
-        Demo register uses local storage; BOQ rows merge when the API is reachable.
-        Advance stages with Planning (→ PE / AA-ES) or Engineer (→ DE / T-S / NIT)
-        buttons. Export Abstract / SOQ via print (Save as PDF) or CSV. Demo DSR rates
-        are placeholders — not sanctioned.
+        Register persists in local storage (survives refresh). When a row is linked to a
+        BOQ (`boqId`), PE/DE/stage/sanction saves also sync into BOQ metadata
+        (`pwd_delhi_estimate`) and hydrate back on load. Advance with Planning
+        (→ PE / AA-ES) or Engineer (→ DE / T-S / NIT). Export Abstract / SOQ via
+        print (Save as PDF) or CSV. Demo DSR rates are placeholders — not sanctioned.
       </p>
 
       <ConfirmDialog

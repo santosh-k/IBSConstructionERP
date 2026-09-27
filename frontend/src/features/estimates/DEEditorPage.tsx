@@ -36,7 +36,7 @@ import {
   printAbstractOfCost,
   printSOQ,
 } from './estimateExport';
-import { syncEstimateToBoq } from './estimateApiSync';
+import { queueSyncEstimateToBoq, syncEstimateToBoq } from './estimateApiSync';
 
 const inputClass =
   'w-full rounded-md border border-border bg-white px-3 py-2 text-sm outline-none focus:border-[#0B3A6E] focus:ring-1 focus:ring-[#0B3A6E]/30';
@@ -216,6 +216,7 @@ export function DEEditorPage() {
                 projectName: '',
               });
               const saved = saveDEDraft(draft);
+              queueSyncEstimateToBoq(saved);
               navigate(`/estimates/${saved.id}/de`);
             }}
           >
