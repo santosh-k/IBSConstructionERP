@@ -8,7 +8,7 @@ import type { DSRItem } from './types';
 
 /** Banner shown in DE editor — never treat as sanctioned rates. */
 export const DEMO_DSR_BANNER =
-  'Demo DSR catalog (placeholder) — replace with sanctioned PWD Delhi DSR / india_pack when CSV lands.';
+  '⚠ DEMO DSR (not sanctioned) — placeholder rates for officer walkthrough only. Replace with PWD Delhi DSR / india_pack CSV before production use.';
 
 export const DEMO_DSR_CATALOG: readonly DSRItem[] = [
   {

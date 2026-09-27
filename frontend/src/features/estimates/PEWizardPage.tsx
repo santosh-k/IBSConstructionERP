@@ -5,7 +5,7 @@
  */
 import { useMemo, useState, type ReactNode } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, ArrowRight, Check, Save } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Check, Download, Printer, Save } from 'lucide-react';
 import { Breadcrumb, Button, Card, CardContent, CardHeader } from '@/shared/ui';
 import { useToastStore } from '@/stores/useToastStore';
 import type { PEWizardState } from './types';
@@ -20,6 +20,12 @@ import {
   getEstimateById,
   savePEDraft,
 } from './estimateStore';
+import {
+  buildPEAbstractPayload,
+  downloadAbstractCsv,
+  printAbstractOfCost,
+} from './estimateExport';
+import { syncEstimateToBoq } from './estimateApiSync';
 
 const STEPS = [
   { id: 1, title: 'Work basics', subtitle: 'कार्य विवरण · Plinth area' },
@@ -100,6 +106,7 @@ export function PEWizardPage() {
     }
     const saved = savePEDraft(state);
     setState(saved.peDraft ?? state);
+    void syncEstimateToBoq(saved);
     addToast({
       type: 'success',
       title: 'PE saved',
@@ -419,6 +426,34 @@ export function PEWizardPage() {
             <>
               <Button
                 variant="secondary"
+                icon={<Printer className="h-4 w-4" />}
+                onClick={() => {
+                  printAbstractOfCost(buildPEAbstractPayload(state));
+                  addToast({
+                    type: 'success',
+                    title: 'Abstract print window',
+                    message: 'Use Print → Save as PDF (PWD_Delhi_Abstract_…)',
+                  });
+                }}
+              >
+                Export Abstract
+              </Button>
+              <Button
+                variant="secondary"
+                icon={<Download className="h-4 w-4" />}
+                onClick={() => {
+                  downloadAbstractCsv(buildPEAbstractPayload(state));
+                  addToast({
+                    type: 'success',
+                    title: 'Abstract CSV',
+                    message: 'Downloaded PWD_Delhi_Abstract_….csv',
+                  });
+                }}
+              >
+                Abstract CSV
+              </Button>
+              <Button
+                variant="secondary"
                 icon={<Save className="h-4 w-4" />}
                 onClick={() => handleSave(false)}
               >
@@ -482,25 +517,25 @@ function AbstractSummary({
       value: formatInr(abstract.baseCost),
     },
     {
-      label: `Cost Index × ${abstract.costIndexFactor.toFixed(2)}`,
+      label: `Cost Index × ${abstract.costIndexFactor.toFixed(2)} · लागत सूचकांक`,
       value: formatInr(abstract.indexedCost),
     },
     {
-      label: `Contingency (${abstract.contingencyPct}%)`,
+      label: `Contingency (${abstract.contingencyPct}%) · आकस्मिक व्यय`,
       value: formatInr(abstract.contingencyAmount),
     },
     {
-      label: 'Estimated cost (PE)',
+      label: 'Estimated cost (PE) · अनुमानित लागत',
       value: formatInr(abstract.estimatedCost),
       emphasize: true,
     },
     {
-      label: `GST ${abstract.gstPct}% (informational — works contract)`,
+      label: `GST ${abstract.gstPct}% (info — works) · जीएसटी`,
       value: formatInr(abstract.gstAmount),
       muted: true,
     },
     {
-      label: 'Total with GST (info only)',
+      label: 'Total with GST (info only) · जीएसटी सहित',
       value: formatInr(abstract.totalWithGstInfo),
       muted: true,
     },
@@ -517,7 +552,7 @@ function AbstractSummary({
       </div>
 
       <div className="overflow-hidden rounded-lg border border-[#e2e7ef]">
-        <div className="pwd-navy-bar px-4 py-2 text-sm font-semibold">Abstract of Cost</div>
+        <div className="pwd-navy-bar px-4 py-2 text-sm font-semibold">Abstract of Cost · लागत सार</div>
         <table className="w-full text-sm">
           <tbody>
             {rows.map((row) => (

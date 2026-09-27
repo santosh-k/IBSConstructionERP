@@ -7,9 +7,11 @@ import type {
   DEEditorState,
   DELine,
   EstimateRegisterItem,
+  EstimateSanctionNotes,
   EstimateStage,
   PEWizardState,
 } from './types';
+import { ESTIMATE_STAGES } from './types';
 import { computeAbstract } from './peCompute';
 import { computeDEAbstract } from './deCompute';
 import { DEMO_DSR_CATALOG } from './demoDSR';
@@ -287,6 +289,92 @@ export function advanceToDE(estimateId: string): EstimateRegisterItem | undefine
     stage: 'de',
   });
   return saveDEDraft(draft);
+}
+
+
+/** Next stage in Rough → PE → AA/ES → DE → T/S → NIT, or null at end. */
+export function nextStage(stage: EstimateStage): EstimateStage | null {
+  const idx = ESTIMATE_STAGES.indexOf(stage);
+  if (idx < 0 || idx >= ESTIMATE_STAGES.length - 1) return null;
+  return ESTIMATE_STAGES[idx + 1]!;
+}
+
+/** Role-ish label for who typically advances from this stage (demo only). */
+export function advanceRoleHint(from: EstimateStage): string {
+  switch (from) {
+    case 'rough':
+    case 'pe':
+      return 'Planning';
+    case 'aa_es':
+    case 'de':
+    case 'ts':
+      return 'Engineer';
+    default:
+      return 'Officer';
+  }
+}
+
+export function setEstimateStage(
+  estimateId: string,
+  stage: EstimateStage,
+): EstimateRegisterItem | undefined {
+  const existing = getEstimateById(estimateId);
+  if (!existing) return undefined;
+  const updated: EstimateRegisterItem = {
+    ...existing,
+    stage,
+    updatedAt: nowIso(),
+  };
+  if (stage === 'pe' && updated.peDraft) {
+    updated.peDraft = { ...updated.peDraft, stage: 'pe', updatedAt: updated.updatedAt };
+  }
+  if (stage === 'de' && updated.deDraft) {
+    updated.deDraft = { ...updated.deDraft, stage: 'de', updatedAt: updated.updatedAt };
+  }
+  upsertEstimate(updated);
+  return updated;
+}
+
+/** Advance one step along the pipeline (with optional DE draft creation). */
+export function advanceEstimateStage(
+  estimateId: string,
+): EstimateRegisterItem | undefined {
+  const existing = getEstimateById(estimateId);
+  if (!existing) return undefined;
+  const nxt = nextStage(existing.stage);
+  if (!nxt) return existing;
+  if (nxt === 'de' && !existing.deDraft) {
+    return advanceToDE(estimateId);
+  }
+  if (nxt === 'pe' && !existing.peDraft) {
+    const pe = createEmptyPEWizard({
+      id: existing.id,
+      workName: existing.name,
+      projectName: existing.projectName,
+      stage: 'pe',
+    });
+    return savePEDraft(pe);
+  }
+  return setEstimateStage(estimateId, nxt);
+}
+
+export function saveSanctionNotes(
+  estimateId: string,
+  notes: EstimateSanctionNotes,
+): EstimateRegisterItem | undefined {
+  const existing = getEstimateById(estimateId);
+  if (!existing) return undefined;
+  const updated: EstimateRegisterItem = {
+    ...existing,
+    sanction: {
+      aaEsNote: notes.aaEsNote ?? '',
+      tsNote: notes.tsNote ?? '',
+      powerNote: notes.powerNote ?? '',
+    },
+    updatedAt: nowIso(),
+  };
+  upsertEstimate(updated);
+  return updated;
 }
 
 /** Map BOQ status strings loosely onto estimate stages for optional merge. */

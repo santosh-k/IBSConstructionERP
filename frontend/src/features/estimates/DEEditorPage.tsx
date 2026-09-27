@@ -7,8 +7,10 @@ import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import {
   ArrowLeft,
+  Download,
   FilePlus2,
   Plus,
+  Printer,
   Save,
   Search,
   Trash2,
@@ -27,6 +29,14 @@ import {
   loadRegister,
   saveDEDraft,
 } from './estimateStore';
+import {
+  buildDEAbstractPayload,
+  downloadAbstractCsv,
+  downloadSOQCsv,
+  printAbstractOfCost,
+  printSOQ,
+} from './estimateExport';
+import { syncEstimateToBoq } from './estimateApiSync';
 
 const inputClass =
   'w-full rounded-md border border-border bg-white px-3 py-2 text-sm outline-none focus:border-[#0B3A6E] focus:ring-1 focus:ring-[#0B3A6E]/30';
@@ -162,6 +172,7 @@ export function DEEditorPage() {
     }
     const saved = saveDEDraft(state);
     setState(saved.deDraft ?? state);
+    void syncEstimateToBoq(saved);
     addToast({
       type: 'success',
       title: 'DE saved',
@@ -303,6 +314,35 @@ export function DEEditorPage() {
             onClick={() => navigate('/estimates')}
           >
             Register
+          </Button>
+          <Button
+            variant="secondary"
+            icon={<Printer className="h-4 w-4" />}
+            onClick={() => {
+              printAbstractOfCost(buildDEAbstractPayload(state));
+              addToast({
+                type: 'success',
+                title: 'Abstract print window',
+                message: 'Print → Save as PDF',
+              });
+            }}
+          >
+            Abstract
+          </Button>
+          <Button
+            variant="secondary"
+            icon={<Download className="h-4 w-4" />}
+            disabled={state.lines.length === 0}
+            onClick={() => {
+              downloadSOQCsv(state);
+              addToast({
+                type: 'success',
+                title: 'SOQ CSV',
+                message: `PWD_Delhi_SOQ · ${state.lines.length} lines`,
+              });
+            }}
+          >
+            SOQ CSV
           </Button>
           <Button
             variant="secondary"
@@ -541,7 +581,7 @@ export function DEEditorPage() {
         <aside className="space-y-4 lg:sticky lg:top-4 lg:self-start">
           <Card padding="none" className="overflow-hidden border border-[#e2e7ef] shadow-sm">
             <div className="pwd-navy-bar px-4 py-2.5 text-sm font-semibold">
-              Abstract of Cost
+              Abstract of Cost · लागत सार
             </div>
             <div className="space-y-3 px-4 py-4">
               <label className="block text-xs font-medium text-content-secondary">
@@ -560,14 +600,14 @@ export function DEEditorPage() {
               <table className="w-full text-sm">
                 <tbody>
                   <tr className="border-t border-border/70">
-                    <td className="py-2 text-content-secondary">Works total</td>
+                    <td className="py-2 text-content-secondary">Works total · कार्य योग</td>
                     <td className="py-2 text-right tabular-nums font-medium">
                       {formatInr(abstract.worksTotal)}
                     </td>
                   </tr>
                   <tr className="border-t border-border/70">
                     <td className="py-2 text-content-secondary">
-                      Contingency ({abstract.contingencyPct}%)
+                      Contingency ({abstract.contingencyPct}%) · आकस्मिक
                     </td>
                     <td className="py-2 text-right tabular-nums">
                       {formatInr(abstract.contingencyAmount)}
@@ -575,7 +615,7 @@ export function DEEditorPage() {
                   </tr>
                   <tr className="border-t border-border/70 bg-[#e8eef5]">
                     <td className="py-2.5 font-semibold text-[#0B3A6E]">
-                      Grand total (DE)
+                      Grand total (DE) · कुल लागत
                     </td>
                     <td className="py-2.5 text-right tabular-nums text-base font-bold text-[#0B3A6E]">
                       {formatInr(abstract.estimatedCost)}
@@ -583,7 +623,7 @@ export function DEEditorPage() {
                   </tr>
                   <tr className="border-t border-border/70">
                     <td className="py-2 text-xs text-content-tertiary">
-                      GST {abstract.gstPct}% (info)
+                      GST {abstract.gstPct}% (info) · जीएसटी
                     </td>
                     <td className="py-2 text-right text-xs tabular-nums text-content-tertiary">
                       {formatInr(abstract.gstAmount)}
@@ -601,8 +641,73 @@ export function DEEditorPage() {
               </table>
               <p className="text-2xs text-content-tertiary leading-relaxed">
                 GST is informational for works contracts and is not added into
-                the DE amount shown on the register.
+                the DE amount shown on the register. Demo DSR rates are
+                placeholders — not sanctioned.
               </p>
+              <div className="flex flex-col gap-2 pt-1">
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  icon={<Printer className="h-3.5 w-3.5" />}
+                  onClick={() => {
+                    printAbstractOfCost(buildDEAbstractPayload(state));
+                    addToast({
+                      type: 'success',
+                      title: 'Abstract print window',
+                      message: 'Print → Save as PDF (PWD_Delhi_Abstract_…)',
+                    });
+                  }}
+                >
+                  Export Abstract
+                </Button>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  icon={<Download className="h-3.5 w-3.5" />}
+                  onClick={() => {
+                    downloadAbstractCsv(buildDEAbstractPayload(state));
+                    addToast({
+                      type: 'success',
+                      title: 'Abstract CSV',
+                      message: 'Downloaded PWD_Delhi_Abstract_….csv',
+                    });
+                  }}
+                >
+                  Abstract CSV
+                </Button>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  icon={<Printer className="h-3.5 w-3.5" />}
+                  disabled={state.lines.length === 0}
+                  onClick={() => {
+                    printSOQ(state);
+                    addToast({
+                      type: 'success',
+                      title: 'SOQ print window',
+                      message: `${state.lines.length} lines · Print → Save as PDF`,
+                    });
+                  }}
+                >
+                  Export SOQ
+                </Button>
+                <Button
+                  variant="primary"
+                  size="sm"
+                  icon={<Download className="h-3.5 w-3.5" />}
+                  disabled={state.lines.length === 0}
+                  onClick={() => {
+                    downloadSOQCsv(state);
+                    addToast({
+                      type: 'success',
+                      title: 'SOQ CSV',
+                      message: `PWD_Delhi_SOQ_….csv · ${state.lines.length} lines`,
+                    });
+                  }}
+                >
+                  SOQ CSV
+                </Button>
+              </div>
             </div>
           </Card>
         </aside>

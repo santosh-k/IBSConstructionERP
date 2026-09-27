@@ -1,23 +1,51 @@
 /**
  * PWD Delhi — Estimate Register
  * Stages: Rough → PE → AA/ES → DE → T/S → NIT
- * Spacious gov-simple UI (white cards, navy headers).
+ * Officer-simple stage advance + Abstract/SOQ export + Sanction notes.
  */
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { FilePlus2, FolderOpen, Search, Table2, ClipboardList } from 'lucide-react';
-import { Badge, Breadcrumb, Button, Card, EmptyState } from '@/shared/ui';
+import {
+  ChevronRight,
+  ClipboardList,
+  Download,
+  FilePlus2,
+  FolderOpen,
+  Printer,
+  Scale,
+  Search,
+  Table2,
+} from 'lucide-react';
+import { Badge, Breadcrumb, Button, Card, ConfirmDialog, EmptyState } from '@/shared/ui';
 import { apiGet } from '@/shared/lib/api';
 import { DateDisplay } from '@/shared/ui/DateDisplay';
+import { useToastStore } from '@/stores/useToastStore';
 import {
   ESTIMATE_STAGE_LABELS,
   ESTIMATE_STAGES,
   type EstimateRegisterItem,
+  type EstimateSanctionNotes,
   type EstimateStage,
 } from './types';
 import { formatInr } from './peCompute';
-import { advanceToDE, loadRegister, stageFromBoqStatus } from './estimateStore';
+import {
+  advanceEstimateStage,
+  advanceRoleHint,
+  advanceToDE,
+  loadRegister,
+  nextStage,
+  saveSanctionNotes,
+  stageFromBoqStatus,
+} from './estimateStore';
+import {
+  abstractPayloadForRegisterItem,
+  downloadAbstractCsv,
+  downloadSOQCsv,
+  printAbstractOfCost,
+  printSOQ,
+  soqStateForRegisterItem,
+} from './estimateExport';
 
 interface ProjectRow {
   id: string;
@@ -58,9 +86,17 @@ function stageBadgeVariant(
 
 export function EstimateRegisterPage() {
   const navigate = useNavigate();
+  const addToast = useToastStore((s) => s.addToast);
   const [items, setItems] = useState<EstimateRegisterItem[]>(() => loadRegister());
   const [stageFilter, setStageFilter] = useState<EstimateStage | 'all'>('all');
   const [search, setSearch] = useState('');
+  const [advanceTarget, setAdvanceTarget] = useState<EstimateRegisterItem | null>(null);
+  const [sanctionTarget, setSanctionTarget] = useState<EstimateRegisterItem | null>(null);
+  const [sanctionForm, setSanctionForm] = useState<EstimateSanctionNotes>({
+    aaEsNote: '',
+    tsNote: '',
+    powerNote: '',
+  });
 
   const refresh = useCallback(() => {
     setItems(loadRegister());
@@ -70,7 +106,6 @@ export function EstimateRegisterPage() {
     refresh();
   }, [refresh]);
 
-  // Optional: surface BOQ list alongside local register (demo-friendly).
   const { data: projects } = useQuery({
     queryKey: ['pwd-estimates-projects'],
     queryFn: () => apiGet<ProjectRow[]>('/v1/projects/'),
@@ -98,6 +133,8 @@ export function EstimateRegisterPage() {
               updatedAt: b.updated_at || b.created_at || new Date().toISOString(),
               boqId: b.id,
               peDraft: null,
+              deDraft: null,
+              sanction: null,
             })) as EstimateRegisterItem[];
           } catch {
             return [] as EstimateRegisterItem[];
@@ -113,7 +150,6 @@ export function EstimateRegisterPage() {
   const merged = useMemo(() => {
     const byId = new Map<string, EstimateRegisterItem>();
     for (const row of items) byId.set(row.id, row);
-    // BOQ-derived rows appear only when not already represented by a PE draft id.
     for (const row of boqDerived ?? []) {
       if (!byId.has(row.id)) byId.set(row.id, row);
     }
@@ -144,32 +180,111 @@ export function EstimateRegisterPage() {
     });
   }, [merged, stageFilter, search]);
 
+  const openPE = (row: EstimateRegisterItem) => {
+    navigate(`/estimates/pe/${row.id}`);
+  };
+
+  const openDE = (row: EstimateRegisterItem) => {
+    if ((row.stage === 'aa_es' || row.stage === 'pe') && !row.deDraft) {
+      advanceToDE(row.id);
+      refresh();
+    }
+    navigate(`/estimates/${row.id}/de`);
+  };
+
   const openEstimate = (row: EstimateRegisterItem) => {
     if (row.stage === 'de' || row.deDraft) {
-      navigate(`/estimates/${row.id}/de`);
+      openDE(row);
       return;
     }
     if (row.peDraft || row.stage === 'pe' || row.stage === 'rough') {
-      navigate(`/estimates/pe/${row.id}`);
+      openPE(row);
       return;
     }
     if (row.stage === 'aa_es') {
-      navigate(`/estimates/${row.id}/de`);
+      openDE(row);
       return;
     }
     if (row.boqId) {
       navigate(`/boq/${row.boqId}`);
       return;
     }
-    navigate(`/estimates/pe/${row.id}`);
+    openPE(row);
   };
 
-  const openDE = (row: EstimateRegisterItem) => {
-    if (row.stage === 'aa_es' && !row.deDraft) {
-      advanceToDE(row.id);
-      refresh();
+  const confirmAdvance = () => {
+    if (!advanceTarget) return;
+    const from = advanceTarget.stage;
+    const nxt = nextStage(from);
+    const updated = advanceEstimateStage(advanceTarget.id);
+    setAdvanceTarget(null);
+    refresh();
+    if (updated && nxt) {
+      addToast({
+        type: 'success',
+        title: `Stage → ${ESTIMATE_STAGE_LABELS[nxt]}`,
+        message: `${updated.name} · ${advanceRoleHint(from)} advance`,
+      });
     }
-    navigate(`/estimates/${row.id}/de`);
+  };
+
+  const openSanction = (row: EstimateRegisterItem) => {
+    setSanctionTarget(row);
+    setSanctionForm({
+      aaEsNote: row.sanction?.aaEsNote ?? '',
+      tsNote: row.sanction?.tsNote ?? '',
+      powerNote: row.sanction?.powerNote ?? '',
+    });
+  };
+
+  const saveSanction = () => {
+    if (!sanctionTarget) return;
+    saveSanctionNotes(sanctionTarget.id, sanctionForm);
+    setSanctionTarget(null);
+    refresh();
+    addToast({
+      type: 'success',
+      title: 'Sanction notes saved',
+      message: sanctionTarget.name,
+    });
+  };
+
+  const exportAbstract = (row: EstimateRegisterItem, mode: 'print' | 'csv') => {
+    const payload = abstractPayloadForRegisterItem(row);
+    if (!payload) {
+      addToast({
+        type: 'warning',
+        title: 'No abstract',
+        message: 'Open PE or DE first to build an Abstract of Cost.',
+      });
+      return;
+    }
+    if (mode === 'print') printAbstractOfCost(payload);
+    else downloadAbstractCsv(payload);
+    addToast({
+      type: 'success',
+      title: mode === 'print' ? 'Abstract print window' : 'Abstract CSV downloaded',
+      message: `PWD_Delhi_Abstract_${row.name.slice(0, 24)}…`,
+    });
+  };
+
+  const exportSOQ = (row: EstimateRegisterItem, mode: 'print' | 'csv') => {
+    const de = soqStateForRegisterItem(row);
+    if (!de || de.lines.length === 0) {
+      addToast({
+        type: 'warning',
+        title: 'No SOQ lines',
+        message: 'Open DE and add DSR/NS lines before exporting SOQ.',
+      });
+      return;
+    }
+    if (mode === 'print') printSOQ(de);
+    else downloadSOQCsv(de);
+    addToast({
+      type: 'success',
+      title: mode === 'print' ? 'SOQ print window' : 'SOQ CSV downloaded',
+      message: `PWD_Delhi_SOQ · ${de.lines.length} lines`,
+    });
   };
 
   return (
@@ -275,7 +390,7 @@ export function EstimateRegisterPage() {
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[720px] text-left text-sm">
+            <table className="w-full min-w-[860px] text-left text-sm">
               <thead>
                 <tr className="border-b border-border bg-white text-content-tertiary">
                   <th className="px-4 py-3 font-medium">Name / Work</th>
@@ -287,49 +402,121 @@ export function EstimateRegisterPage() {
                 </tr>
               </thead>
               <tbody>
-                {filtered.map((row) => (
-                  <tr
-                    key={row.id}
-                    className="border-b border-border/70 last:border-0 hover:bg-[#F5F7FA]/80"
-                  >
-                    <td className="px-4 py-3.5">
-                      <div className="font-medium text-content-primary">{row.name}</div>
-                      <div className="mt-0.5 text-xs text-content-tertiary line-clamp-1">
-                        {row.workDescription}
-                      </div>
-                    </td>
-                    <td className="px-4 py-3.5 text-content-secondary">{row.projectName}</td>
-                    <td className="px-4 py-3.5">
-                      <Badge variant={stageBadgeVariant(row.stage)} size="sm" dot>
-                        {ESTIMATE_STAGE_LABELS[row.stage]}
-                      </Badge>
-                    </td>
-                    <td className="px-4 py-3.5 text-right tabular-nums font-medium text-content-primary">
-                      {formatInr(row.amountInr)}
-                    </td>
-                    <td className="px-4 py-3.5 text-content-secondary">
-                      <DateDisplay value={row.updatedAt} />
-                    </td>
-                    <td className="px-4 py-3.5">
-                      <div className="flex justify-end gap-2">
-                        <Button variant="secondary" size="sm" onClick={() => openEstimate(row)}>
-                          Open
-                        </Button>
-                        {(row.stage === 'de' ||
-                          row.stage === 'aa_es' ||
-                          row.deDraft) && (
-                          <Button
-                            variant="primary"
-                            size="sm"
-                            onClick={() => openDE(row)}
-                          >
-                            Open DE
+                {filtered.map((row) => {
+                  const nxt = nextStage(row.stage);
+                  const role = advanceRoleHint(row.stage);
+                  const hasSOQ = !!(row.deDraft && row.deDraft.lines.length > 0);
+                  return (
+                    <tr
+                      key={row.id}
+                      className="border-b border-border/70 last:border-0 hover:bg-[#F5F7FA]/80"
+                    >
+                      <td className="px-4 py-3.5">
+                        <div className="font-medium text-content-primary">{row.name}</div>
+                        <div className="mt-0.5 text-xs text-content-tertiary line-clamp-1">
+                          {row.workDescription}
+                        </div>
+                      </td>
+                      <td className="px-4 py-3.5 text-content-secondary">{row.projectName}</td>
+                      <td className="px-4 py-3.5">
+                        <Badge variant={stageBadgeVariant(row.stage)} size="sm" dot>
+                          {ESTIMATE_STAGE_LABELS[row.stage]}
+                        </Badge>
+                      </td>
+                      <td className="px-4 py-3.5 text-right tabular-nums font-medium text-content-primary">
+                        {formatInr(row.amountInr)}
+                      </td>
+                      <td className="px-4 py-3.5 text-content-secondary">
+                        <DateDisplay value={row.updatedAt} />
+                      </td>
+                      <td className="px-4 py-3.5">
+                        <div className="flex flex-wrap justify-end gap-1.5">
+                          <Button variant="secondary" size="sm" onClick={() => openEstimate(row)}>
+                            Open
                           </Button>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                ))}
+                          {(row.stage === 'rough' ||
+                            row.stage === 'pe' ||
+                            row.peDraft) && (
+                            <Button variant="secondary" size="sm" onClick={() => openPE(row)}>
+                              Open PE
+                            </Button>
+                          )}
+                          {(row.stage === 'aa_es' ||
+                            row.stage === 'de' ||
+                            row.stage === 'ts' ||
+                            row.stage === 'nit' ||
+                            row.deDraft ||
+                            row.stage === 'pe') && (
+                            <Button variant="primary" size="sm" onClick={() => openDE(row)}>
+                              Open DE
+                            </Button>
+                          )}
+                          {nxt && (
+                            <Button
+                              variant="secondary"
+                              size="sm"
+                              icon={<ChevronRight className="h-3.5 w-3.5" />}
+                              iconPosition="right"
+                              onClick={() => setAdvanceTarget(row)}
+                              title={`${role}: advance to ${ESTIMATE_STAGE_LABELS[nxt]}`}
+                            >
+                              {role} → {ESTIMATE_STAGE_LABELS[nxt]}
+                            </Button>
+                          )}
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            icon={<Scale className="h-3.5 w-3.5" />}
+                            onClick={() => openSanction(row)}
+                            title="Sanction / AA-ES / T-S notes"
+                          >
+                            Sanction
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            icon={<Printer className="h-3.5 w-3.5" />}
+                            onClick={() => exportAbstract(row, 'print')}
+                            title="Print Abstract of Cost"
+                          >
+                            Abstract
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            icon={<Download className="h-3.5 w-3.5" />}
+                            onClick={() => exportAbstract(row, 'csv')}
+                            title="Download Abstract CSV"
+                          >
+                            Abs CSV
+                          </Button>
+                          {hasSOQ && (
+                            <>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                icon={<Printer className="h-3.5 w-3.5" />}
+                                onClick={() => exportSOQ(row, 'print')}
+                                title="Print SOQ"
+                              >
+                                SOQ
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                icon={<Download className="h-3.5 w-3.5" />}
+                                onClick={() => exportSOQ(row, 'csv')}
+                                title="Download SOQ CSV"
+                              >
+                                SOQ CSV
+                              </Button>
+                            </>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -338,8 +525,103 @@ export function EstimateRegisterPage() {
 
       <p className="mt-4 text-xs text-content-tertiary">
         Demo register uses local storage; BOQ rows merge when the API is reachable.
-        Open DE-stage rows for the Detailed Estimate (DSR) editor.
+        Advance stages with Planning (→ PE / AA-ES) or Engineer (→ DE / T-S / NIT)
+        buttons. Export Abstract / SOQ via print (Save as PDF) or CSV. Demo DSR rates
+        are placeholders — not sanctioned.
       </p>
+
+      <ConfirmDialog
+        open={!!advanceTarget}
+        onCancel={() => setAdvanceTarget(null)}
+        onConfirm={confirmAdvance}
+        variant="warning"
+        title="Advance estimate stage?"
+        message={
+          advanceTarget
+            ? `${advanceTarget.name} — ${ESTIMATE_STAGE_LABELS[advanceTarget.stage]} → ${
+                nextStage(advanceTarget.stage)
+                  ? ESTIMATE_STAGE_LABELS[nextStage(advanceTarget.stage)!]
+                  : '—'
+              } (${advanceRoleHint(advanceTarget.stage)} wing — demo, not full RBAC)`
+            : ''
+        }
+        confirmLabel="Advance stage"
+        cancelLabel="Cancel"
+      />
+
+      {/* Sanction panel (minimal) */}
+      {sanctionTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4">
+          <div
+            className="w-full max-w-lg rounded-lg border border-[#e2e7ef] bg-white shadow-xl"
+            role="dialog"
+            aria-labelledby="sanction-title"
+          >
+            <div className="pwd-navy-bar flex items-center justify-between rounded-t-lg px-4 py-3">
+              <span id="sanction-title" className="text-sm font-semibold">
+                Sanction panel · स्वीकृति
+              </span>
+              <button
+                type="button"
+                className="text-sm underline opacity-90"
+                onClick={() => setSanctionTarget(null)}
+              >
+                Close
+              </button>
+            </div>
+            <div className="space-y-4 px-4 py-4">
+              <p className="text-xs text-content-tertiary">
+                {sanctionTarget.name} · Stage:{' '}
+                {ESTIMATE_STAGE_LABELS[sanctionTarget.stage]} — lightweight notes
+                only (AA/ES status + T/S power).
+              </p>
+              <label className="block text-sm font-medium text-content-primary">
+                AA/ES note (Planning / Admin)
+                <textarea
+                  className="mt-1 w-full rounded-md border border-border bg-white px-3 py-2 text-sm outline-none focus:border-[#0B3A6E] focus:ring-1 focus:ring-[#0B3A6E]/30"
+                  rows={2}
+                  value={sanctionForm.aaEsNote}
+                  onChange={(e) =>
+                    setSanctionForm((f) => ({ ...f, aaEsNote: e.target.value }))
+                  }
+                  placeholder="e.g. AA accorded vide order … / ES amount …"
+                />
+              </label>
+              <label className="block text-sm font-medium text-content-primary">
+                T/S note (Engineer / CE)
+                <textarea
+                  className="mt-1 w-full rounded-md border border-border bg-white px-3 py-2 text-sm outline-none focus:border-[#0B3A6E] focus:ring-1 focus:ring-[#0B3A6E]/30"
+                  rows={2}
+                  value={sanctionForm.tsNote}
+                  onChange={(e) =>
+                    setSanctionForm((f) => ({ ...f, tsNote: e.target.value }))
+                  }
+                  placeholder="e.g. T/S recommended / pending CE"
+                />
+              </label>
+              <label className="block text-sm font-medium text-content-primary">
+                Sanctioning power / authority
+                <input
+                  className="mt-1 w-full rounded-md border border-border bg-white px-3 py-2 text-sm outline-none focus:border-[#0B3A6E] focus:ring-1 focus:ring-[#0B3A6E]/30"
+                  value={sanctionForm.powerNote}
+                  onChange={(e) =>
+                    setSanctionForm((f) => ({ ...f, powerNote: e.target.value }))
+                  }
+                  placeholder="e.g. EE / SE / CE as per DoP"
+                />
+              </label>
+              <div className="flex justify-end gap-2 pt-1">
+                <Button variant="secondary" onClick={() => setSanctionTarget(null)}>
+                  Cancel
+                </Button>
+                <Button variant="primary" onClick={saveSanction}>
+                  Save notes
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

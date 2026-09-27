@@ -43,6 +43,18 @@ export interface EstimateRegisterItem {
   peDraft?: PEWizardState | null;
   /** Detailed Estimate draft (DSR lines + Abstract of Cost) */
   deDraft?: DEEditorState | null;
+  /** Lightweight sanction / status notes (AA/ES, T/S) — demo panel */
+  sanction?: EstimateSanctionNotes | null;
+}
+
+/** Optional AA/ES + T/S notes shown on Sanction panel (not full workflow). */
+export interface EstimateSanctionNotes {
+  /** AA/ES status or reference (Planning / Admin) */
+  aaEsNote: string;
+  /** Technical Sanction note / power (Engineer / CE) */
+  tsNote: string;
+  /** Sanctioning power / authority text */
+  powerNote: string;
 }
 
 export interface PEWizardState {
