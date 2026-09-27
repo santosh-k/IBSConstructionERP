@@ -6,6 +6,7 @@ declare const __APP_VERSION__: string;
 interface ImportMetaEnv {
   readonly VITE_CIVILCORE_DEMO?: string;
   readonly VITE_APP_NAME?: string;
+  readonly VITE_APP_NAME_HI?: string;
   readonly VITE_APP_SHORT_NAME?: string;
   readonly VITE_APP_TAGLINE?: string;
   readonly VITE_APP_WEBSITE?: string;

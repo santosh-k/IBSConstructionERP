@@ -2,7 +2,7 @@ import { Suspense, lazy, useState, useCallback, useEffect } from 'react';
 import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { AppLayout } from './layout';
 import { DashboardPage } from '@/features/dashboard';
-import { LoginPage, LoginPageNext, RegisterPage, ForgotPasswordPage } from '@/features/auth';
+import { LoginPage, LoginPageNext, PwdDelhiLoginPage, RegisterPage, ForgotPasswordPage } from '@/features/auth';
 import { ProjectsPage, CreateProjectPage, ProjectDetailPage, ProjectSettingsPage } from '@/features/projects';
 import { BOQListPage, CreateBOQPage, TemplatesPage } from '@/features/boq';
 import { syncCustomUnitsFromServer } from '@/features/boq/boqHelpers';
@@ -31,7 +31,7 @@ import { useKeyboardShortcuts } from '@/shared/hooks/useKeyboardShortcuts';
 import { useTranslation } from 'react-i18next';
 import { getLanguageByCode } from './i18n';
 import { initErrorLogger } from '@/shared/lib/errorLogger';
-import { syncCivilCoreDemoFromHealth } from '@/shared/lib/civilcoreDemo';
+import { syncCivilCoreDemoFromHealth, isCivilCoreDemo } from '@/shared/lib/civilcoreDemo';
 import { useModuleStore } from '@/stores/useModuleStore';
 
 // Lazy-loaded heavy pages — code-split into separate chunks
@@ -452,7 +452,7 @@ export default function App() {
         <Route path="/share/:token" element={<SharePage />} />
 
         {/* Auth — public */}
-        <Route path="/login" element={isAuthenticated ? <Navigate to="/" replace /> : <LoginPage />} />
+        <Route path="/login" element={isAuthenticated ? <Navigate to="/" replace /> : (isCivilCoreDemo() ? <PwdDelhiLoginPage /> : <LoginPage />)} />
         <Route path="/login-next" element={isAuthenticated ? <Navigate to="/" replace /> : <LoginPageNext />} />
         <Route path="/register" element={isAuthenticated ? <Navigate to="/" replace /> : <RegisterPage />} />
         <Route path="/forgot-password" element={isAuthenticated ? <Navigate to="/" replace /> : <ForgotPasswordPage />} />
@@ -628,7 +628,12 @@ export default function App() {
             day-works, instructions, time-impact analysis. */}
         <Route path="/variations" element={<P title="Variations"><VariationsPage /></P>} />
         <Route path="/projects/:projectId/variations" element={<P title="Variations"><VariationsPage /></P>} />
+        {/* PWD Phase A: Estimates (PE/DE) — register + PE wizard land in later phases.
+            Canonical alias today: /estimates → /boq. Planned: /estimates (register),
+            /estimates/pe (PE wizard), /estimates/:id/de (DE editor). */}
         <Route path="/estimates" element={<Navigate to="/boq" replace />} />
+        <Route path="/estimates/pe" element={<Navigate to="/boq" replace />} />
+        <Route path="/estimates/register" element={<Navigate to="/boq" replace />} />
         <Route path="/profile" element={<Navigate to="/settings" replace />} />
         <Route path="/notifications" element={<P title="Notifications"><NotificationsPage /></P>} />
 
