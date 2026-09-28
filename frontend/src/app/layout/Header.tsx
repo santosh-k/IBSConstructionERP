@@ -16,6 +16,7 @@ import { exportErrorReport, getErrorCount, getLastError } from '@/shared/lib/err
 import { APP_VERSION, APP_BUILD_FINGERPRINT } from '@/shared/lib/version';
 import { useToastStore } from '@/stores/useToastStore';
 import { useI18nReady } from '@/shared/lib/useI18nReady';
+import { showExternalCommunityLinks } from '@/shared/lib/appBranding';
 
 /** Map English page titles (passed from App.tsx routes) to i18n keys. */
 const TITLE_I18N_MAP: Record<string, string> = {
@@ -167,8 +168,8 @@ export function Header({ title, onMenuClick }: HeaderProps) {
             help dropdown. The little red dot turns on when errors were
             captured this session. */}
         <NotificationBell />
-        <BugReportMenu />
-        <HelpMenu />
+        {showExternalCommunityLinks() && <BugReportMenu />}
+        {showExternalCommunityLinks() && <HelpMenu />}
 
         {/* Hairline divider between Zone 3 and Zone 4. */}
         <div className="hidden sm:block h-4 w-px bg-border-light/70" aria-hidden />
@@ -581,7 +582,9 @@ function HelpMenu() {
           role="menu"
           className="absolute right-0 top-full mt-1.5 w-60 rounded-xl border border-border-light bg-surface-elevated shadow-lg animate-scale-in py-1 z-40"
         >
-          {/* External resources */}
+          {/* External resources — hidden in PWD officer demo */}
+          {showExternalCommunityLinks() && (
+            <>
           <a
             role="menuitem"
             href="https://openconstructionerp.com/docs.html"
@@ -608,7 +611,11 @@ function HelpMenu() {
           </a>
 
           <div className="my-1 border-t border-border-light" role="separator" />
+            </>
+          )}
 
+{showExternalCommunityLinks() && (
+          <>
           {/* Feedback / report flows */}
           <button
             type="button"
@@ -646,6 +653,8 @@ function HelpMenu() {
             <Mail size={14} className="text-content-tertiary shrink-0" />
             <span>{t('header.email_issues', { defaultValue: 'Email the team' })}</span>
           </a>
+          </>
+          )}
         </div>
       )}
     </div>

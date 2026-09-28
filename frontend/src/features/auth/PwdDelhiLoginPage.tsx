@@ -250,7 +250,7 @@ export function PwdDelhiLoginPage() {
             </h1>
             <p className="mt-1 text-sm text-content-secondary leading-snug">{tagline}</p>
             <p className="mt-2 text-[11px] text-content-tertiary">
-              Government of NCT of Delhi · Public Works Department (demo)
+              Public Works Department · Delhi (demo)
             </p>
           </div>
 

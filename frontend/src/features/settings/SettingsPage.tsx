@@ -38,6 +38,7 @@ import { UpdateNotification } from '@/shared/ui/UpdateChecker';
 import { apiGet, apiPatch, apiPost } from '@/shared/lib/api';
 import { SUPPORTED_LANGUAGES } from '@/app/i18n';
 import { useAuthStore } from '@/stores/useAuthStore';
+import { getAppDisplayName, showExternalCommunityLinks } from '@/shared/lib/appBranding';
 import { useThemeStore } from '@/stores/useThemeStore';
 import { useToastStore } from '@/stores/useToastStore';
 import { useViewModeStore } from '@/stores/useViewModeStore';
@@ -989,9 +990,11 @@ export function SettingsPage() {
 
       {/* Update notification — surfaced in Settings so users see new
           versions even if they dismissed the sidebar widget for the session. */}
+      {showExternalCommunityLinks() && (
       <div className="-mx-4 sm:-mx-7 mb-6">
         <UpdateNotification forceShow hideDismiss />
       </div>
+      )}
 
       {/* Page header */}
       <div className="mb-6 animate-card-in">
@@ -1081,7 +1084,7 @@ export function SettingsPage() {
               to="/about"
               className="inline-flex items-center gap-1 text-xs text-content-tertiary hover:text-oe-blue transition-colors"
             >
-              {t('settings.about_link', { defaultValue: 'About CivilCore' })}
+              {t('settings.about_link', { defaultValue: `About ${getAppDisplayName()}` })}
               <ChevronRight size={11} />
             </Link>
           </div>
@@ -1234,7 +1237,7 @@ export function SettingsPage() {
                         {t('settings.sign_out_title', { defaultValue: 'Sign out of all sessions' })}
                       </p>
                       <p className="text-xs text-content-secondary mt-0.5">
-                        {t('settings.sign_out_desc', { defaultValue: 'You will need to enter your credentials to access CivilCore again.' })}
+                        {t('settings.sign_out_desc', { defaultValue: `You will need to enter your credentials to access ${getAppDisplayName()} again.` })}
                       </p>
                     </div>
                     <Button
@@ -1462,7 +1465,7 @@ export function SettingsPage() {
               to="/about"
               className="inline-flex items-center gap-1 text-sm text-content-tertiary hover:text-oe-blue transition-colors"
             >
-              {t('settings.about_link', { defaultValue: 'About CivilCore' })}
+              {t('settings.about_link', { defaultValue: `About ${getAppDisplayName()}` })}
               <ChevronRight size={12} />
             </Link>
           </div>

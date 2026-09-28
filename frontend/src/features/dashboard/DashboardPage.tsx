@@ -44,6 +44,7 @@ import { CompactProjectCard } from './components/CompactProjectCard';
 import { DashboardProjectsMap } from './components/DashboardProjectsMap';
 import { ShowAllProjectsCard } from './components/ShowAllProjectsCard';
 import { DateDisplay } from '@/shared/ui/DateDisplay';
+import { showExternalCommunityLinks } from '@/shared/lib/appBranding';
 
 /* ── Types ────────────────────────────────────────────────────────────── */
 
@@ -1877,6 +1878,8 @@ export function DashboardPage() {
 
       {/* ─── 2. Hero · row B — thin meta-strip ───────────────────────── */}
       <div className="flex items-center flex-wrap gap-x-4 gap-y-2 pl-2 animate-stagger-in" style={{ animationDelay: '140ms' }}>
+        {showExternalCommunityLinks() && (
+          <>
         {/* DDC attribution — slim inline link with tiny logo */}
         <a
           href="https://datadrivenconstruction.io/?utm_source=erp"
@@ -1912,6 +1915,8 @@ export function DashboardPage() {
         </a>
 
         <span aria-hidden className="h-3 w-px bg-border-light" />
+          </>
+        )}
 
         {/* System status pills */}
         <SystemStatusSummary projects={projects} boqs={allBoqs} />

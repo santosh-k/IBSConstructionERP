@@ -90,7 +90,7 @@ import {
   isRouteHiddenInCivilCoreDemo,
   isRouteAllowedInPwdDemo,
 } from '@/shared/lib/civilcoreDemo';
-import { getAppDisplayName, getAppDisplayNameHi, getAppShortName, getGithubRepoUrl } from '@/shared/lib/appBranding';
+import { getAppDisplayName, getAppDisplayNameHi, getAppShortName, getGithubRepoUrl, showExternalCommunityLinks } from '@/shared/lib/appBranding';
 
 
 interface NavItem {
@@ -677,33 +677,40 @@ export function Sidebar({ onClose }: { onClose?: () => void }) {
           iconified ? 'justify-center px-0' : 'justify-between',
         )}
       >
-        <a
-          href={getGithubRepoUrl()}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="hover:opacity-80 transition-opacity"
-          title={iconified ? getAppDisplayName() : undefined}
-        >
-          {iconified ? (
-            <Logo size="sm" />
-          ) : hideAiNav ? (
-            <div className="flex items-center gap-2 min-w-0">
-              <Logo size="xs" />
-              <div className="min-w-0 leading-tight">
-                <div className="text-[13px] font-extrabold text-[#0B3A6E] truncate tracking-tight">
-                  {getAppShortName()}
-                </div>
-                {getAppDisplayNameHi() ? (
-                  <div className="text-[10px] text-content-tertiary truncate font-medium">
-                    {getAppDisplayNameHi()}
+        {hideAiNav || !showExternalCommunityLinks() ? (
+          <div
+            className="hover:opacity-80 transition-opacity"
+            title={iconified ? getAppDisplayName() : undefined}
+          >
+            {iconified ? (
+              <Logo size="sm" />
+            ) : (
+              <div className="flex items-center gap-2 min-w-0">
+                <Logo size="xs" />
+                <div className="min-w-0 leading-tight">
+                  <div className="text-[13px] font-extrabold text-[#0B3A6E] truncate tracking-tight">
+                    {getAppShortName()}
                   </div>
-                ) : null}
+                  {getAppDisplayNameHi() ? (
+                    <div className="text-[10px] text-content-tertiary truncate font-medium">
+                      {getAppDisplayNameHi()}
+                    </div>
+                  ) : null}
+                </div>
               </div>
-            </div>
-          ) : (
-            <LogoWithText size="xs" />
-          )}
-        </a>
+            )}
+          </div>
+        ) : (
+          <a
+            href={getGithubRepoUrl()}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="hover:opacity-80 transition-opacity"
+            title={iconified ? getAppDisplayName() : undefined}
+          >
+            {iconified ? <Logo size="sm" /> : <LogoWithText size="xs" />}
+          </a>
+        )}
         {!iconified && onClose && (
           <button
             onClick={onClose}
@@ -1072,14 +1079,15 @@ export function Sidebar({ onClose }: { onClose?: () => void }) {
             commands when the user clicks it. Hidden in icon-only mode
             because the card is text-heavy; users will still see it after
             expanding the sidebar. */}
-        {!iconified && <UpdateNotification />}
+        {!iconified && showExternalCommunityLinks() && <UpdateNotification />}
 
         {/* Version + AGPL + GitHub link
             Layout: GitHub icon (left) · version · AGPL link.
             The GitHub link uses Lucide's Github mark — keeps the row aligned
             with the rest of the sidebar's lucide icons and gives a clear
             visual entry point to the source repo. */}
-        {iconified ? (
+        {showExternalCommunityLinks() ? (
+          iconified ? (
           // Icon-only footer: GitHub + Telegram stacked. The expand
           // toggle lives on the floating edge-pill, not down here, so
           // users see only one toggle entry-point — no duplicate UI.
@@ -1149,6 +1157,14 @@ export function Sidebar({ onClose }: { onClose?: () => void }) {
                 AGPL-3.0
               </a>
             </div>
+          </div>
+        )
+        ) : (
+          <div className="px-2 pb-2 pt-1 flex flex-col items-center gap-1">
+            <span className="text-2xs text-content-tertiary">v{APP_VERSION}</span>
+            <span className="text-[10px] text-content-quaternary text-center leading-snug px-1">
+              {getAppShortName()} · Works Estimating
+            </span>
           </div>
         )}
       </div>

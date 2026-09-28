@@ -9,7 +9,7 @@ export const PWD_DELHI_APP_NAME = 'PWD Delhi — Works Estimating';
 export const PWD_DELHI_APP_NAME_HI = 'लोक निर्माण विभाग — लागत अनुमान';
 export const PWD_DELHI_SHORT_NAME = 'PWD Delhi';
 export const PWD_DELHI_TAGLINE =
-  'Planning & Engineer works cost calculator · NCT of Delhi';
+  'Planning & Engineer works cost calculator · PWD Delhi';
 
 const UPSTREAM_GITHUB = 'https://github.com/datadrivenconstruction/OpenConstructionERP';
 const DEFAULT_GITHUB =
@@ -64,6 +64,11 @@ export function getGithubRepoUrl(): string {
 
 export function getUpstreamGithubUrl(): string {
   return envString('VITE_APP_UPSTREAM_GITHUB') ?? UPSTREAM_GITHUB;
+}
+
+/** Officer-facing PWD demo: hide GitHub / Discord / LinkedIn / Telegram / sponsor chrome. */
+export function showExternalCommunityLinks(): boolean {
+  return !isCivilCoreDemo();
 }
 
 /** Hidden integrity / attribution line (AGPL upstream). */

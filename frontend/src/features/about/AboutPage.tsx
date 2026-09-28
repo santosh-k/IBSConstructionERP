@@ -11,13 +11,56 @@ import {
 } from 'lucide-react';
 import { Card, Button, Badge } from '@/shared/ui';
 import { APP_VERSION } from '@/shared/lib/version';
-import { getAppDisplayName, getGithubRepoUrl, getProductWebsiteUrl } from '@/shared/lib/appBranding';
+import {
+  getAppDisplayName,
+  getAppDisplayNameHi,
+  getAppTagline,
+  getGithubRepoUrl,
+  getProductWebsiteUrl,
+  showExternalCommunityLinks,
+} from '@/shared/lib/appBranding';
+import { isCivilCoreDemo } from '@/shared/lib/civilcoreDemo';
+
 import { UpdateNotification } from '@/shared/ui/UpdateChecker';
 import { Changelog } from './Changelog';
 
 export function AboutPage() {
   const { t } = useTranslation();
   const appName = getAppDisplayName();
+  const officerDemo = isCivilCoreDemo() || !showExternalCommunityLinks();
+
+  if (officerDemo) {
+    const appNameHi = getAppDisplayNameHi();
+    const tagline = getAppTagline();
+    return (
+      <div className="max-w-2xl mx-auto space-y-6 animate-fade-in">
+        <div className="text-center py-6">
+          <h1 className="text-2xl font-bold text-[#0B3A6E] tracking-tight">{appName}</h1>
+          {appNameHi ? (
+            <p className="mt-1 text-sm font-medium text-content-secondary">{appNameHi}</p>
+          ) : null}
+          <p className="mt-2 text-sm text-content-secondary">{tagline}</p>
+          <div className="mt-3 flex items-center justify-center gap-3 text-sm text-content-tertiary">
+            <span className="font-mono">v{APP_VERSION}</span>
+            <span>&middot;</span>
+            <span>Planning + Engineer wings</span>
+          </div>
+        </div>
+        <Card>
+          <div className="p-6 space-y-3 text-sm text-content-secondary leading-relaxed">
+            <p>
+              Internal works cost calculator for Public Works Department (Delhi) officers —
+              Preliminary Estimate (PE), Detailed Estimate (DE), DSR rates, and sanction stages.
+              This is not a citizen Sewa portal.
+            </p>
+            <p className="text-xs text-content-tertiary">
+              Demo build for Planning and Engineer roles. Not an official GNCTD production system.
+            </p>
+          </div>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-3xl mx-auto space-y-6 animate-fade-in">
