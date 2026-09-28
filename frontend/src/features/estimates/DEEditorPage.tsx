@@ -1,6 +1,6 @@
 /**
  * PWD Delhi — Detailed Estimate (DE) editor
- * Engineer wing: pick DSR demo items, enter qty, Abstract of Cost rollup,
+ * Engineer wing: pick DSR catalog items, enter qty, Abstract of Cost rollup,
  * optional NS rate-analysis drawer.
  */
 import { useEffect, useMemo, useState } from 'react';
@@ -22,7 +22,7 @@ import type { DEEditorState, DELine, DSRItem, NSRateAnalysis } from './types';
 import { ESTIMATE_STAGE_LABELS } from './types';
 import { computeDEAbstract, lineAmount, nsRateFromAnalysis } from './deCompute';
 import { formatInr } from './peCompute';
-import { DEMO_DSR_BANNER, DEMO_DSR_CATALOG, searchDemoDSR } from './demoDSR';
+import { DSR_CATALOG_BANNER, DSR_CATALOG, searchDSR } from './demoDSR';
 import {
   createEmptyDE,
   getEstimateById,
@@ -95,7 +95,7 @@ export function DEEditorPage() {
   const nsLine = state.lines.find((l) => l.id === nsLineId) ?? null;
 
   const filteredDsr = useMemo(
-    () => searchDemoDSR(dsrSearch, dsrCategory),
+    () => searchDSR(dsrSearch, dsrCategory),
     [dsrSearch, dsrCategory],
   );
 
@@ -436,7 +436,7 @@ export function DEEditorPage() {
       </div>
 
       <p className="mb-4 rounded-md border border-[var(--pwd-accent,#E87722)]/30 bg-[var(--pwd-accent-subtle,#fef3e8)] px-3 py-2 text-xs text-[#0B3A6E]">
-        {DEMO_DSR_BANNER}
+        {DSR_CATALOG_BANNER}
       </p>
 
       <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_320px]">
@@ -494,7 +494,7 @@ export function DEEditorPage() {
                 <div className="max-h-56 overflow-y-auto">
                   {filteredDsr.length === 0 ? (
                     <p className="px-4 py-6 text-center text-sm text-content-tertiary">
-                      No demo DSR items match ({DEMO_DSR_CATALOG.length} in catalog).
+                      No DSR items match ({DSR_CATALOG.length} in catalog).
                     </p>
                   ) : (
                     <ul className="divide-y divide-border/60">
@@ -719,8 +719,8 @@ export function DEEditorPage() {
               </table>
               <p className="text-2xs text-content-tertiary leading-relaxed">
                 GST is informational for works contracts and is not added into
-                the DE amount shown on the register. Demo DSR rates are
-                placeholders — not sanctioned.
+                the DE amount shown on the register. Rates are from Sample
+                CPWD/Delhi DSR seed — not for tender award.
               </p>
               <div className="flex flex-col gap-2 pt-1">
                 <Button

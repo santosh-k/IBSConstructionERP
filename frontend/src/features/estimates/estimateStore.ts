@@ -14,7 +14,7 @@ import type {
 import { ESTIMATE_STAGES } from './types';
 import { computeAbstract } from './peCompute';
 import { computeDEAbstract } from './deCompute';
-import { DEMO_DSR_CATALOG } from './demoDSR';
+import { DSR_CATALOG } from './demoDSR';
 
 const STORAGE_KEY = 'pwd_delhi_estimate_register_v2';
 
@@ -61,7 +61,7 @@ export function createEmptyDE(
 
 function seedDemoDELines(): DELine[] {
   const pick = (code: string, qty: number): DELine | null => {
-    const item = DEMO_DSR_CATALOG.find((d) => d.code === code);
+    const item = DSR_CATALOG.find((d) => d.code === code);
     if (!item) return null;
     return {
       id: uid('dl'),

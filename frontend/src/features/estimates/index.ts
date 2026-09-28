@@ -16,7 +16,14 @@ export type {
 export { ESTIMATE_STAGES, ESTIMATE_STAGE_LABELS, GST_WORKS_PCT } from './types';
 export { computeAbstract, formatInr } from './peCompute';
 export { computeDEAbstract, lineAmount } from './deCompute';
-export { DEMO_DSR_CATALOG, DEMO_DSR_BANNER } from './demoDSR';
+export {
+  DSR_CATALOG,
+  DSR_CATALOG_BANNER,
+  DSR_CATALOG_COUNT,
+  searchDSR,
+  DEMO_DSR_CATALOG,
+  DEMO_DSR_BANNER,
+} from './demoDSR';
 export {
   nextStage,
   advanceRoleHint,

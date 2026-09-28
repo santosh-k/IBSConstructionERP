@@ -97,7 +97,7 @@ export interface AbstractOfCost {
   totalWithGstInfo: number;
 }
 
-/** Demo / pack DSR schedule item (PWD Delhi SOR-style). */
+/** DSR schedule item (PWD Delhi / CPWD SOR-style catalog). */
 export interface DSRItem {
   code: string;
   description: string;
