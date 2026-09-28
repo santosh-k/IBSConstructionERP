@@ -14,7 +14,7 @@ import {
 } from '@/shared/lib/appBranding';
 import { useAuthStore } from '@/stores/useAuthStore';
 import { extractErrorMessageFromBody } from '@/shared/lib/api';
-import { SUPPORTED_LANGUAGES } from '@/app/i18n';
+import { getPickerLanguages } from '@/app/i18n';
 
 const DEMO_PASSWORD = 'DemoPass1234!';
 
@@ -48,7 +48,7 @@ export function PwdDelhiLoginPage() {
   const langRef = useRef<HTMLDivElement>(null);
 
   const currentLang =
-    SUPPORTED_LANGUAGES.find((l) => l.code === i18n.language) ?? SUPPORTED_LANGUAGES[0]!;
+    getPickerLanguages().find((l) => l.code === i18n.language) ?? getPickerLanguages()[0]!;
 
   const appName = getAppDisplayName();
   const appNameHi = getAppDisplayNameHi();
@@ -213,7 +213,7 @@ export function PwdDelhiLoginPage() {
           </button>
           {langOpen && (
             <div className="absolute right-0 mt-2 w-56 max-h-72 overflow-y-auto rounded-md border border-border-light bg-white shadow-lg py-1 z-30">
-              {SUPPORTED_LANGUAGES.map((lang) => {
+              {getPickerLanguages().map((lang) => {
                 const isActive = i18n.language === lang.code;
                 return (
                   <button

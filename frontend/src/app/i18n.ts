@@ -1,6 +1,7 @@
 import i18n from 'i18next';
 import { initReactI18next } from 'react-i18next';
 import { useTranslation as useI18nTranslation } from 'react-i18next';
+import { isCivilCoreDemo } from '@/shared/lib/civilcoreDemo';
 
 export const SUPPORTED_LANGUAGES = [
   { code: 'en', name: 'English', flag: '🇬🇧', country: 'gb' },
@@ -33,6 +34,21 @@ export const SUPPORTED_LANGUAGES = [
 
 export function getLanguageByCode(code: string): (typeof SUPPORTED_LANGUAGES)[number] {
   return SUPPORTED_LANGUAGES.find((l) => l.code === code) ?? SUPPORTED_LANGUAGES[0]!;
+}
+
+/** Codes offered in the UI language picker for CivilCore / PWD Delhi demo. */
+export const PWD_DEMO_LANGUAGE_CODES = ['en', 'hi'] as const;
+
+/**
+ * Languages shown in pickers / settings / login.
+ * Full catalog for normal builds; English + Hindi only when CivilCore/PWD demo
+ * mode is on (``VITE_CIVILCORE_DEMO`` / health flag). Locale files for other
+ * languages remain loadable for non-demo builds via {@link SUPPORTED_LANGUAGES}.
+ */
+export function getPickerLanguages(): typeof SUPPORTED_LANGUAGES {
+  if (!isCivilCoreDemo()) return SUPPORTED_LANGUAGES;
+  const allowed = new Set<string>(PWD_DEMO_LANGUAGE_CODES);
+  return SUPPORTED_LANGUAGES.filter((l) => allowed.has(l.code));
 }
 
 // Re-export useTranslation for convenience
@@ -108,7 +124,7 @@ export function applyModuleTranslations(
  * Resolve the initial UI language.
  *
  * Priority chain (first match wins):
- *   1. ``?lang=`` URL query param (validated against ``SUPPORTED_LANGUAGES``).
+ *   1. ``?lang=`` URL query param (validated against {@link getPickerLanguages}).
  *      If valid we also persist it to ``localStorage`` so the choice survives
  *      a refresh after the param is dropped from the URL.
  *   2. ``localStorage`` (``i18nextLng`` key) — last user choice.
@@ -119,7 +135,9 @@ export function applyModuleTranslations(
  * guarded so the function returns ``'en'`` when called outside a browser.
  */
 function resolveInitialLanguage(): string {
-  const supported = SUPPORTED_LANGUAGES.map((l) => l.code);
+  // Demo builds validate against the picker allowlist (en/hi) so a stale
+  // ``i18nextLng`` like ``de`` cannot leave the UI in a hidden language.
+  const supported = getPickerLanguages().map((l) => l.code);
   const isValid = (code: string | null | undefined): code is string =>
     !!code && supported.includes(code);
 
@@ -144,6 +162,14 @@ function resolveInitialLanguage(): string {
   try {
     const stored = window.localStorage.getItem('i18nextLng');
     if (isValid(stored)) return stored;
+    // Outside picker allowlist (e.g. ``pl`` under PWD demo) → reset to en.
+    if (stored) {
+      try {
+        window.localStorage.setItem('i18nextLng', 'en');
+      } catch {
+        // localStorage unavailable — non-fatal.
+      }
+    }
   } catch {
     // localStorage unavailable — fall through.
   }

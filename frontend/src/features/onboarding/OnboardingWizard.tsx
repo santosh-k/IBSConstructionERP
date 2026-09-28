@@ -29,7 +29,7 @@ import {
 } from 'lucide-react';
 import { isCivilCoreDemo } from '@/shared/lib/civilcoreDemo';
 import { Logo, Button, CountryFlag, Badge } from '@/shared/ui';
-import { SUPPORTED_LANGUAGES } from '@/app/i18n';
+import { getPickerLanguages } from '@/app/i18n';
 import { useToastStore } from '@/stores/useToastStore';
 import { useUploadQueueStore } from '@/stores/useUploadQueueStore';
 import { useAuthStore } from '@/stores/useAuthStore';
@@ -535,7 +535,7 @@ function StepWelcome({
   const { t } = useTranslation();
   const [selected, setSelected] = useState(() => {
     const detected = navigator.language?.split('-')[0] || 'en';
-    const match = SUPPORTED_LANGUAGES.find((l) => l.code === detected);
+    const match = getPickerLanguages().find((l) => l.code === detected);
     return match ? match.code : 'en';
   });
 
@@ -558,7 +558,7 @@ function StepWelcome({
     const explicit = localStorage.getItem('oe_lang_explicit');
     if (explicit) return;
     const detected = navigator.language?.split('-')[0] || 'en';
-    const match = SUPPORTED_LANGUAGES.find((l) => l.code === detected);
+    const match = getPickerLanguages().find((l) => l.code === detected);
     const target = match ? match.code : 'en';
     if (target !== i18n.language) {
       i18n.changeLanguage(target);
@@ -608,7 +608,7 @@ function StepWelcome({
           <span className="h-px w-8 bg-border-light" aria-hidden />
         </div>
         <div className="grid grid-cols-3 sm:grid-cols-4 gap-2.5">
-          {SUPPORTED_LANGUAGES.map((lang) => {
+          {getPickerLanguages().map((lang) => {
             const isSelected = selected === lang.code;
             return (
               <button
@@ -1755,7 +1755,7 @@ function StepFinish({
         </span>
         <span className="text-content-tertiary">|</span>
         <span>
-          {SUPPORTED_LANGUAGES.find((l) => l.code === i18n.language)?.name || i18n.language}
+          {getPickerLanguages().find((l) => l.code === i18n.language)?.name || i18n.language}
         </span>
       </div>
 

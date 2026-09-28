@@ -7,7 +7,7 @@ import { useToastStore } from '@/stores/useToastStore';
 import { useProjectContextStore } from '@/stores/useProjectContextStore';
 import { useAuthStore } from '@/stores/useAuthStore';
 import { getIntlLocale } from '@/shared/lib/formatters';
-import { SUPPORTED_LANGUAGES } from '@/app/i18n';
+import { getPickerLanguages } from '@/app/i18n';
 import { uploadDocument, fetchDocuments, type DocumentItem } from '@/features/documents/api';
 import {
   FolderPlus,
@@ -2469,7 +2469,7 @@ function SystemStatus() {
         style={{ animationDelay: '220ms' }}
       >
         <span className="text-sm text-content-secondary">{t('dashboard.languages')}</span>
-        <span className="text-sm font-semibold text-content-primary tabular-nums">{SUPPORTED_LANGUAGES.length}</span>
+        <span className="text-sm font-semibold text-content-primary tabular-nums">{getPickerLanguages().length}</span>
       </div>
     </div>
   );

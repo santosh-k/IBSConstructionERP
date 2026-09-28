@@ -18,7 +18,7 @@ import {
 import { useAuthStore } from '@/stores/useAuthStore';
 import { extractErrorMessageFromBody } from '@/shared/lib/api';
 import { AuthBackground } from './AuthBackground';
-import { SUPPORTED_LANGUAGES } from '@/app/i18n';
+import { getPickerLanguages } from '@/app/i18n';
 
 export function LoginPage() {
   const { t, i18n } = useTranslation();
@@ -50,7 +50,7 @@ export function LoginPage() {
   const langRef = useRef<HTMLDivElement>(null);
 
   const currentLang =
-    SUPPORTED_LANGUAGES.find((l) => l.code === i18n.language) ?? SUPPORTED_LANGUAGES[0]!;
+    getPickerLanguages().find((l) => l.code === i18n.language) ?? getPickerLanguages()[0]!;
 
   // Clear form on mount (prevents pre-fill after logout)
   useEffect(() => {
@@ -279,7 +279,7 @@ export function LoginPage() {
         </button>
         {langOpen && (
           <div className="absolute right-0 mt-2 w-64 max-h-80 overflow-y-auto rounded-xl border border-border-light bg-surface-elevated shadow-xl py-1 animate-stagger-in">
-            {SUPPORTED_LANGUAGES.map((lang) => {
+            {getPickerLanguages().map((lang) => {
               const isActive = i18n.language === lang.code;
               const english = 'english' in lang ? (lang as { english?: string }).english : undefined;
               return (

@@ -4,7 +4,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { Search, ChevronDown, ChevronRight, LogOut, User, Settings, Menu, MessageSquarePlus, FolderOpen, CheckCircle2, XCircle, Bug, BookOpen, Loader2, Upload, HelpCircle, Mail, ExternalLink, Github, Sun, Moon, Monitor } from 'lucide-react';
 import clsx from 'clsx';
-import { SUPPORTED_LANGUAGES, getLanguageByCode } from '../i18n';
+import { SUPPORTED_LANGUAGES, getPickerLanguages, getLanguageByCode } from '../i18n';
 import { useAuthStore } from '@/stores/useAuthStore';
 import { useUploadQueueStore } from '@/stores/useUploadQueueStore';
 import { useProjectContextStore } from '@/stores/useProjectContextStore';
@@ -711,7 +711,7 @@ function LanguageSwitcher({
 
       {open && (
         <div role="menu" className="absolute right-0 top-full mt-1.5 w-48 max-h-72 overflow-y-auto rounded-xl border border-border-light bg-surface-elevated shadow-lg animate-scale-in py-1">
-          {SUPPORTED_LANGUAGES.map((lang) => (
+          {getPickerLanguages().map((lang) => (
             <button
               key={lang.code}
               role="menuitem"

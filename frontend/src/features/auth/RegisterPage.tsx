@@ -8,7 +8,7 @@ import {
 } from 'lucide-react';
 import { Button, Input, LogoWithText, CountryFlag } from '@/shared/ui';
 import { getAppDisplayName, getGithubRepoUrl, getProductWebsiteUrl } from '@/shared/lib/appBranding';
-import { SUPPORTED_LANGUAGES, getLanguageByCode } from '@/app/i18n';
+import { getPickerLanguages, getLanguageByCode } from '@/app/i18n';
 import { useAuthStore } from '@/stores/useAuthStore';
 import { AuthBackground } from './AuthBackground';
 
@@ -141,7 +141,7 @@ export function RegisterPage() {
         </button>
         {langOpen && (
           <div className="absolute right-0 mt-1 w-44 max-h-72 overflow-y-auto rounded-xl border border-border-light bg-surface-elevated shadow-xl py-0.5 animate-stagger-in">
-            {SUPPORTED_LANGUAGES.map((lang) => {
+            {getPickerLanguages().map((lang) => {
               const isActive = i18n.language === lang.code;
               return (
                 <button
