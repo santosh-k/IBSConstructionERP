@@ -324,7 +324,7 @@ export function PEWizardPage() {
           {step === 3 && (
             <>
               <p className="text-sm text-content-secondary">
-                Apply the current Cost Index factor for NCT of Delhi.
+                Apply the current Cost Index factor for PWD Delhi.
               </p>
               <div className="space-y-2">
                 {DEMO_COST_INDEX_OPTIONS.map((opt) => {

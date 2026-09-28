@@ -33,7 +33,7 @@ export function createEmptyPEWizard(partial?: Partial<PEWizardState>): PEWizardS
     projectName: partial?.projectName ?? '',
     workType: partial?.workType ?? 'building',
     plinthAreaSqm: partial?.plinthAreaSqm ?? 0,
-    locationNote: partial?.locationNote ?? 'Circle / Division — NCT of Delhi',
+    locationNote: partial?.locationNote ?? 'Circle / Division — PWD Delhi',
     parCode: partial?.parCode ?? '',
     parDescription: partial?.parDescription ?? '',
     parRate: partial?.parRate ?? 0,
