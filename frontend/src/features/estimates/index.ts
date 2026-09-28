@@ -40,3 +40,21 @@ export {
   PWD_ESTIMATE_META_KEY,
 } from './estimateApiSync';
 
+
+export {
+  loadDemoWingRole,
+  saveDemoWingRole,
+  canAdvanceFromStage,
+  advanceBlockedReason,
+  canCreateOrEditPE,
+  peEditBlockedReason,
+  canCreateOrEditDE,
+  deEditBlockedReason,
+  canEditAaEsNote,
+  canEditTsSanctionNotes,
+  DEMO_ROLE_LABELS,
+  DEMO_ROLE_BANNER,
+  DEMO_WING_STORAGE_KEY,
+} from './demoRoles';
+export type { DemoWingRole } from './demoRoles';
+export { DemoRoleSwitcher, useDemoWingRole, RoleGate } from './DemoRoleSwitcher';

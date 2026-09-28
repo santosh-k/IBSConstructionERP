@@ -2,6 +2,7 @@
  * PWD Delhi — Estimate Register
  * Stages: Rough → PE → AA/ES → DE → T/S → NIT
  * Officer-simple stage advance + Abstract/SOQ export + Sanction notes.
+ * Demo Planning vs Engineer wing switcher (localStorage — not prod RBAC).
  */
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -50,6 +51,19 @@ import {
   mergeBoqRowWithMetadata,
   queueSyncEstimateToBoq,
 } from './estimateApiSync';
+import {
+  advanceBlockedReason,
+  aaEsNoteBlockedReason,
+  canAdvanceFromStage,
+  canCreateOrEditDE,
+  canCreateOrEditPE,
+  canEditAaEsNote,
+  canEditTsSanctionNotes,
+  deEditBlockedReason,
+  peEditBlockedReason,
+  tsSanctionBlockedReason,
+} from './demoRoles';
+import { DemoRoleSwitcher, RoleGate, useDemoWingRole } from './DemoRoleSwitcher';
 
 interface ProjectRow {
   id: string;
@@ -92,6 +106,7 @@ function stageBadgeVariant(
 export function EstimateRegisterPage() {
   const navigate = useNavigate();
   const addToast = useToastStore((s) => s.addToast);
+  const [demoRole] = useDemoWingRole();
   const [items, setItems] = useState<EstimateRegisterItem[]>(() => loadRegister());
   const [stageFilter, setStageFilter] = useState<EstimateStage | 'all'>('all');
   const [search, setSearch] = useState('');
@@ -186,11 +201,23 @@ export function EstimateRegisterPage() {
   }, [merged, stageFilter, search]);
 
   const openPE = (row: EstimateRegisterItem) => {
+    // Viewing PE is allowed for both; create/edit gated on PE page + New PE.
     navigate(`/estimates/pe/${row.id}`);
   };
 
   const openDE = (row: EstimateRegisterItem) => {
+    // Opening DE for view is allowed; deep-edit gated on DE page.
+    // Only Engineer may create a skeleton DE when advancing from PE/AA-ES.
     if ((row.stage === 'aa_es' || row.stage === 'pe') && !row.deDraft) {
+      if (!canCreateOrEditDE(demoRole)) {
+        addToast({
+          type: 'warning',
+          title: 'DE create blocked',
+          message: deEditBlockedReason(demoRole) ?? '',
+        });
+        navigate(`/estimates/${row.id}/de`);
+        return;
+      }
       const advanced = advanceToDE(row.id);
       queueSyncEstimateToBoq(advanced);
       refresh();
@@ -221,6 +248,12 @@ export function EstimateRegisterPage() {
   const confirmAdvance = () => {
     if (!advanceTarget) return;
     const from = advanceTarget.stage;
+    const blocked = advanceBlockedReason(demoRole, from);
+    if (blocked) {
+      addToast({ type: 'warning', title: 'Advance blocked (demo role)', message: blocked });
+      setAdvanceTarget(null);
+      return;
+    }
     const nxt = nextStage(from);
     const updated = advanceEstimateStage(advanceTarget.id);
     setAdvanceTarget(null);
@@ -246,7 +279,28 @@ export function EstimateRegisterPage() {
 
   const saveSanction = () => {
     if (!sanctionTarget) return;
-    const saved = saveSanctionNotes(sanctionTarget.id, sanctionForm);
+    // Merge only fields this demo wing may edit — never wipe the other wing's notes.
+    const existing = sanctionTarget.sanction;
+    const nextNotes: EstimateSanctionNotes = {
+      aaEsNote: canEditAaEsNote(demoRole)
+        ? sanctionForm.aaEsNote
+        : (existing?.aaEsNote ?? ''),
+      tsNote: canEditTsSanctionNotes(demoRole)
+        ? sanctionForm.tsNote
+        : (existing?.tsNote ?? ''),
+      powerNote: canEditTsSanctionNotes(demoRole)
+        ? sanctionForm.powerNote
+        : (existing?.powerNote ?? ''),
+    };
+    if (!canEditAaEsNote(demoRole) && !canEditTsSanctionNotes(demoRole)) {
+      addToast({
+        type: 'warning',
+        title: 'Sanction blocked',
+        message: 'No editable sanction fields for this demo role.',
+      });
+      return;
+    }
+    const saved = saveSanctionNotes(sanctionTarget.id, nextNotes);
     setSanctionTarget(null);
     queueSyncEstimateToBoq(saved);
     refresh();
@@ -305,6 +359,8 @@ export function EstimateRegisterPage() {
         className="mb-4"
       />
 
+      <DemoRoleSwitcher />
+
       <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight text-[#0B3A6E]">
@@ -315,20 +371,46 @@ export function EstimateRegisterPage() {
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <Button
-            variant="primary"
-            icon={<FilePlus2 className="h-4 w-4" />}
-            onClick={() => navigate('/estimates/pe')}
-          >
-            New PE
-          </Button>
-          <Button
-            variant="secondary"
-            icon={<ClipboardList className="h-4 w-4" />}
-            onClick={() => navigate('/estimates/de')}
-          >
-            Open DE
-          </Button>
+          <RoleGate blocked={!canCreateOrEditPE(demoRole)} reason={peEditBlockedReason(demoRole)}>
+            <Button
+              variant="primary"
+              icon={<FilePlus2 className="h-4 w-4" />}
+              disabled={!canCreateOrEditPE(demoRole)}
+              onClick={() => {
+                if (!canCreateOrEditPE(demoRole)) {
+                  addToast({
+                    type: 'warning',
+                    title: 'New PE blocked',
+                    message: peEditBlockedReason(demoRole) ?? '',
+                  });
+                  return;
+                }
+                navigate('/estimates/pe');
+              }}
+            >
+              New PE
+            </Button>
+          </RoleGate>
+          <RoleGate blocked={!canCreateOrEditDE(demoRole)} reason={deEditBlockedReason(demoRole)}>
+            <Button
+              variant="secondary"
+              icon={<ClipboardList className="h-4 w-4" />}
+              disabled={!canCreateOrEditDE(demoRole)}
+              onClick={() => {
+                if (!canCreateOrEditDE(demoRole)) {
+                  addToast({
+                    type: 'warning',
+                    title: 'Open DE blocked',
+                    message: deEditBlockedReason(demoRole) ?? '',
+                  });
+                  return;
+                }
+                navigate('/estimates/de');
+              }}
+            >
+              Open DE
+            </Button>
+          </RoleGate>
           <Button variant="secondary" onClick={() => navigate('/boq')}>
             Open BOQ list
           </Button>
@@ -390,9 +472,25 @@ export function EstimateRegisterPage() {
               title="No estimates in this view"
               description="Create a Preliminary Estimate or clear filters."
               action={
-                <Button variant="primary" onClick={() => navigate('/estimates/pe')}>
-                  New PE
-                </Button>
+                <RoleGate blocked={!canCreateOrEditPE(demoRole)} reason={peEditBlockedReason(demoRole)}>
+                  <Button
+                    variant="primary"
+                    disabled={!canCreateOrEditPE(demoRole)}
+                    onClick={() => {
+                      if (!canCreateOrEditPE(demoRole)) {
+                        addToast({
+                          type: 'warning',
+                          title: 'New PE blocked',
+                          message: peEditBlockedReason(demoRole) ?? '',
+                        });
+                        return;
+                      }
+                      navigate('/estimates/pe');
+                    }}
+                  >
+                    New PE
+                  </Button>
+                </RoleGate>
               }
             />
           </div>
@@ -459,18 +557,39 @@ export function EstimateRegisterPage() {
                               Open DE
                             </Button>
                           )}
-                          {nxt && (
-                            <Button
-                              variant="secondary"
-                              size="sm"
-                              icon={<ChevronRight className="h-3.5 w-3.5" />}
-                              iconPosition="right"
-                              onClick={() => setAdvanceTarget(row)}
-                              title={`${role}: advance to ${ESTIMATE_STAGE_LABELS[nxt]}`}
-                            >
-                              {role} → {ESTIMATE_STAGE_LABELS[nxt]}
-                            </Button>
-                          )}
+                          {nxt && (() => {
+                            const canAdv = canAdvanceFromStage(demoRole, row.stage);
+                            const blockReason = advanceBlockedReason(demoRole, row.stage);
+                            return (
+                              <RoleGate blocked={!canAdv} reason={blockReason}>
+                                <Button
+                                  variant="secondary"
+                                  size="sm"
+                                  icon={<ChevronRight className="h-3.5 w-3.5" />}
+                                  iconPosition="right"
+                                  disabled={!canAdv}
+                                  onClick={() => {
+                                    if (!canAdv) {
+                                      addToast({
+                                        type: 'warning',
+                                        title: 'Advance blocked (demo role)',
+                                        message: blockReason ?? '',
+                                      });
+                                      return;
+                                    }
+                                    setAdvanceTarget(row);
+                                  }}
+                                  title={
+                                    canAdv
+                                      ? `${role}: advance to ${ESTIMATE_STAGE_LABELS[nxt]}`
+                                      : (blockReason ?? undefined)
+                                  }
+                                >
+                                  {role} → {ESTIMATE_STAGE_LABELS[nxt]}
+                                </Button>
+                              </RoleGate>
+                            );
+                          })()}
                           <Button
                             variant="ghost"
                             size="sm"
@@ -534,9 +653,11 @@ export function EstimateRegisterPage() {
       <p className="mt-4 text-xs text-content-tertiary">
         Register persists in local storage (survives refresh). When a row is linked to a
         BOQ (`boqId`), PE/DE/stage/sanction saves also sync into BOQ metadata
-        (`pwd_delhi_estimate`) and hydrate back on load. Advance with Planning
-        (→ PE / AA-ES) or Engineer (→ DE / T-S / NIT). Export Abstract / SOQ via
-        print (Save as PDF) or CSV. Demo DSR rates are placeholders — not sanctioned.
+        (`pwd_delhi_estimate`) and hydrate back on load. Use the demo wing switcher:
+        Planning advances Rough→PE→AA/ES and edits PE / AA-ES notes; Engineer opens DE,
+        picks DSR, advances DE→T/S→NIT, and writes T/S notes. Not GNCTD prod RBAC.
+        Export Abstract / SOQ via print (Save as PDF) or CSV. Demo DSR rates are
+        placeholders — not sanctioned.
       </p>
 
       <ConfirmDialog
@@ -551,7 +672,7 @@ export function EstimateRegisterPage() {
                 nextStage(advanceTarget.stage)
                   ? ESTIMATE_STAGE_LABELS[nextStage(advanceTarget.stage)!]
                   : '—'
-              } (${advanceRoleHint(advanceTarget.stage)} wing — demo, not full RBAC)`
+              } (${advanceRoleHint(advanceTarget.stage)} wing · you are ${demoRole} — demo, not full RBAC)`
             : ''
         }
         confirmLabel="Advance stage"
@@ -587,32 +708,48 @@ export function EstimateRegisterPage() {
               <label className="block text-sm font-medium text-content-primary">
                 AA/ES note (Planning / Admin)
                 <textarea
-                  className="mt-1 w-full rounded-md border border-border bg-white px-3 py-2 text-sm outline-none focus:border-[#0B3A6E] focus:ring-1 focus:ring-[#0B3A6E]/30"
+                  className="mt-1 w-full rounded-md border border-border bg-white px-3 py-2 text-sm outline-none focus:border-[#0B3A6E] focus:ring-1 focus:ring-[#0B3A6E]/30 disabled:bg-[#F5F7FA] disabled:text-content-tertiary"
                   rows={2}
                   value={sanctionForm.aaEsNote}
+                  disabled={!canEditAaEsNote(demoRole)}
+                  title={aaEsNoteBlockedReason(demoRole) ?? undefined}
                   onChange={(e) =>
                     setSanctionForm((f) => ({ ...f, aaEsNote: e.target.value }))
                   }
                   placeholder="e.g. AA accorded vide order … / ES amount …"
                 />
+                {!canEditAaEsNote(demoRole) && (
+                  <span className="mt-1 block text-2xs text-content-tertiary">
+                    {aaEsNoteBlockedReason(demoRole)}
+                  </span>
+                )}
               </label>
               <label className="block text-sm font-medium text-content-primary">
                 T/S note (Engineer / CE)
                 <textarea
-                  className="mt-1 w-full rounded-md border border-border bg-white px-3 py-2 text-sm outline-none focus:border-[#0B3A6E] focus:ring-1 focus:ring-[#0B3A6E]/30"
+                  className="mt-1 w-full rounded-md border border-border bg-white px-3 py-2 text-sm outline-none focus:border-[#0B3A6E] focus:ring-1 focus:ring-[#0B3A6E]/30 disabled:bg-[#F5F7FA] disabled:text-content-tertiary"
                   rows={2}
                   value={sanctionForm.tsNote}
+                  disabled={!canEditTsSanctionNotes(demoRole)}
+                  title={tsSanctionBlockedReason(demoRole) ?? undefined}
                   onChange={(e) =>
                     setSanctionForm((f) => ({ ...f, tsNote: e.target.value }))
                   }
                   placeholder="e.g. T/S recommended / pending CE"
                 />
+                {!canEditTsSanctionNotes(demoRole) && (
+                  <span className="mt-1 block text-2xs text-content-tertiary">
+                    {tsSanctionBlockedReason(demoRole)}
+                  </span>
+                )}
               </label>
               <label className="block text-sm font-medium text-content-primary">
                 Sanctioning power / authority
                 <input
-                  className="mt-1 w-full rounded-md border border-border bg-white px-3 py-2 text-sm outline-none focus:border-[#0B3A6E] focus:ring-1 focus:ring-[#0B3A6E]/30"
+                  className="mt-1 w-full rounded-md border border-border bg-white px-3 py-2 text-sm outline-none focus:border-[#0B3A6E] focus:ring-1 focus:ring-[#0B3A6E]/30 disabled:bg-[#F5F7FA] disabled:text-content-tertiary"
                   value={sanctionForm.powerNote}
+                  disabled={!canEditTsSanctionNotes(demoRole)}
+                  title={tsSanctionBlockedReason(demoRole) ?? undefined}
                   onChange={(e) =>
                     setSanctionForm((f) => ({ ...f, powerNote: e.target.value }))
                   }
@@ -623,9 +760,18 @@ export function EstimateRegisterPage() {
                 <Button variant="secondary" onClick={() => setSanctionTarget(null)}>
                   Cancel
                 </Button>
-                <Button variant="primary" onClick={saveSanction}>
-                  Save notes
-                </Button>
+                <RoleGate
+                  blocked={!canEditAaEsNote(demoRole) && !canEditTsSanctionNotes(demoRole)}
+                  reason="No editable sanction fields for this demo role."
+                >
+                  <Button
+                    variant="primary"
+                    disabled={!canEditAaEsNote(demoRole) && !canEditTsSanctionNotes(demoRole)}
+                    onClick={saveSanction}
+                  >
+                    Save notes
+                  </Button>
+                </RoleGate>
               </div>
             </div>
           </div>

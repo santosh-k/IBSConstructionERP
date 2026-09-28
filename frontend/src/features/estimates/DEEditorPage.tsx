@@ -37,6 +37,8 @@ import {
   printSOQ,
 } from './estimateExport';
 import { queueSyncEstimateToBoq, syncEstimateToBoq } from './estimateApiSync';
+import { canCreateOrEditDE, deEditBlockedReason } from './demoRoles';
+import { DemoRoleSwitcher, RoleGate, useDemoWingRole } from './DemoRoleSwitcher';
 
 const inputClass =
   'w-full rounded-md border border-border bg-white px-3 py-2 text-sm outline-none focus:border-[#0B3A6E] focus:ring-1 focus:ring-[#0B3A6E]/30';
@@ -67,6 +69,9 @@ export function DEEditorPage() {
   const { estimateId } = useParams<{ estimateId?: string }>();
   const navigate = useNavigate();
   const addToast = useToastStore((s) => s.addToast);
+  const [demoRole] = useDemoWingRole();
+  const canEdit = canCreateOrEditDE(demoRole);
+  const deBlock = deEditBlockedReason(demoRole);
 
   // /estimates/de without id → picker from register (aa_es / de rows) or new
   const isPicker = !estimateId;
@@ -109,10 +114,12 @@ export function DEEditorPage() {
   }, [isPicker, pickerSearch]);
 
   const patch = (partial: Partial<DEEditorState>) => {
+    if (!canEdit) return;
     setState((prev) => ({ ...prev, ...partial }));
   };
 
   const updateLine = (id: string, partial: Partial<DELine>) => {
+    if (!canEdit) return;
     setState((prev) => ({
       ...prev,
       lines: prev.lines.map((l) => (l.id === id ? { ...l, ...partial } : l)),
@@ -120,6 +127,14 @@ export function DEEditorPage() {
   };
 
   const addDsrItem = (item: DSRItem) => {
+    if (!canEdit) {
+      addToast({
+        type: 'warning',
+        title: 'DSR pick blocked (demo role)',
+        message: deBlock ?? '',
+      });
+      return;
+    }
     const line: DELine = {
       id: uidLine(),
       code: item.code,
@@ -139,6 +154,14 @@ export function DEEditorPage() {
   };
 
   const addNSItem = () => {
+    if (!canEdit) {
+      addToast({
+        type: 'warning',
+        title: 'NS line blocked (demo role)',
+        message: deBlock ?? '',
+      });
+      return;
+    }
     const line: DELine = {
       id: uidLine(),
       code: 'NS',
@@ -154,6 +177,14 @@ export function DEEditorPage() {
   };
 
   const removeLine = (id: string) => {
+    if (!canEdit) {
+      addToast({
+        type: 'warning',
+        title: 'Remove blocked (demo role)',
+        message: deBlock ?? '',
+      });
+      return;
+    }
     setState((prev) => ({
       ...prev,
       lines: prev.lines.filter((l) => l.id !== id),
@@ -162,6 +193,14 @@ export function DEEditorPage() {
   };
 
   const handleSave = (andRegister: boolean) => {
+    if (!canEdit) {
+      addToast({
+        type: 'warning',
+        title: 'DE save blocked (demo role)',
+        message: deBlock ?? '',
+      });
+      return;
+    }
     if (!state.workName.trim()) {
       addToast({
         type: 'warning',
@@ -197,6 +236,12 @@ export function DEEditorPage() {
           ]}
           className="mb-4"
         />
+        <DemoRoleSwitcher />
+        {!canEdit && (
+          <p className="mb-3 rounded-md border border-amber-300/60 bg-amber-50 px-3 py-2 text-xs text-amber-950">
+            {deBlock}
+          </p>
+        )}
         <div className="mb-6">
           <h1 className="text-2xl font-semibold tracking-tight text-[#0B3A6E]">
             Open Detailed Estimate
@@ -207,21 +252,32 @@ export function DEEditorPage() {
         </div>
 
         <div className="mb-4 flex flex-wrap gap-2">
-          <Button
-            variant="primary"
-            icon={<FilePlus2 className="h-4 w-4" />}
-            onClick={() => {
-              const draft = createEmptyDE({
-                workName: '',
-                projectName: '',
-              });
-              const saved = saveDEDraft(draft);
-              queueSyncEstimateToBoq(saved);
-              navigate(`/estimates/${saved.id}/de`);
-            }}
-          >
-            New DE
-          </Button>
+          <RoleGate blocked={!canEdit} reason={deBlock}>
+            <Button
+              variant="primary"
+              icon={<FilePlus2 className="h-4 w-4" />}
+              disabled={!canEdit}
+              onClick={() => {
+                if (!canEdit) {
+                  addToast({
+                    type: 'warning',
+                    title: 'New DE blocked',
+                    message: deBlock ?? '',
+                  });
+                  return;
+                }
+                const draft = createEmptyDE({
+                  workName: '',
+                  projectName: '',
+                });
+                const saved = saveDEDraft(draft);
+                queueSyncEstimateToBoq(saved);
+                navigate(`/estimates/${saved.id}/de`);
+              }}
+            >
+              New DE
+            </Button>
+          </RoleGate>
           <Button variant="secondary" onClick={() => navigate('/estimates')}>
             Back to register
           </Button>
@@ -287,25 +343,37 @@ export function DEEditorPage() {
         className="mb-4"
       />
 
+      <DemoRoleSwitcher />
+      {!canEdit && (
+        <p className="mb-3 rounded-md border border-amber-300/60 bg-amber-50 px-3 py-2 text-xs text-amber-950">
+          {deBlock} · Abstract/SOQ export still available.
+        </p>
+      )}
+
       <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0 flex-1">
           <div className="mb-2 flex flex-wrap items-center gap-2">
             <Badge variant="blue" size="sm" dot>
               {ESTIMATE_STAGE_LABELS.de}
             </Badge>
-            <span className="text-xs text-content-tertiary">Engineer wing</span>
+            <span className="text-xs text-content-tertiary">
+              Engineer wing · demo role: {demoRole}
+            </span>
           </div>
           <input
             className="w-full border-0 border-b border-transparent bg-transparent text-2xl font-semibold tracking-tight text-[#0B3A6E] outline-none focus:border-[#0B3A6E]/40"
             value={state.workName}
             onChange={(e) => patch({ workName: e.target.value })}
             placeholder="Work / estimate name"
+            readOnly={!canEdit}
+            title={!canEdit ? (deBlock ?? undefined) : undefined}
           />
           <input
             className="mt-1 w-full border-0 bg-transparent text-sm text-content-secondary outline-none"
             value={state.projectName}
             onChange={(e) => patch({ projectName: e.target.value })}
             placeholder="Project / circle"
+            readOnly={!canEdit}
           />
         </div>
         <div className="flex flex-wrap gap-2">
@@ -345,16 +413,25 @@ export function DEEditorPage() {
           >
             SOQ CSV
           </Button>
-          <Button
-            variant="secondary"
-            icon={<Save className="h-4 w-4" />}
-            onClick={() => handleSave(false)}
-          >
-            Save
-          </Button>
-          <Button variant="primary" onClick={() => handleSave(true)}>
-            Save &amp; return
-          </Button>
+          <RoleGate blocked={!canEdit} reason={deBlock}>
+            <Button
+              variant="secondary"
+              icon={<Save className="h-4 w-4" />}
+              disabled={!canEdit}
+              onClick={() => handleSave(false)}
+            >
+              Save
+            </Button>
+          </RoleGate>
+          <RoleGate blocked={!canEdit} reason={deBlock}>
+            <Button
+              variant="primary"
+              disabled={!canEdit}
+              onClick={() => handleSave(true)}
+            >
+              Save &amp; return
+            </Button>
+          </RoleGate>
         </div>
       </div>
 

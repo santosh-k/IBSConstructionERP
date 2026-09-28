@@ -26,6 +26,8 @@ import {
   printAbstractOfCost,
 } from './estimateExport';
 import { syncEstimateToBoq } from './estimateApiSync';
+import { canCreateOrEditPE, peEditBlockedReason } from './demoRoles';
+import { DemoRoleSwitcher, RoleGate, useDemoWingRole } from './DemoRoleSwitcher';
 
 const STEPS = [
   { id: 1, title: 'Work basics', subtitle: 'कार्य विवरण · Plinth area' },
@@ -55,12 +57,16 @@ export function PEWizardPage() {
   const { estimateId } = useParams<{ estimateId?: string }>();
   const navigate = useNavigate();
   const addToast = useToastStore((s) => s.addToast);
+  const [demoRole] = useDemoWingRole();
+  const canEdit = canCreateOrEditPE(demoRole);
+  const peBlock = peEditBlockedReason(demoRole);
   const [step, setStep] = useState(1);
   const [state, setState] = useState<PEWizardState>(() => loadInitial(estimateId));
 
   const abstract = useMemo(() => computeAbstract(state), [state]);
 
   const patch = (partial: Partial<PEWizardState>) => {
+    if (!canEdit) return;
     setState((prev) => ({ ...prev, ...partial }));
   };
 
@@ -95,6 +101,14 @@ export function PEWizardPage() {
   const goBack = () => setStep((s) => Math.max(1, s - 1));
 
   const handleSave = (andRegister: boolean) => {
+    if (!canEdit) {
+      addToast({
+        type: 'warning',
+        title: 'PE save blocked (demo role)',
+        message: peBlock ?? '',
+      });
+      return;
+    }
     if (!state.workName.trim()) {
       addToast({
         type: 'warning',
@@ -127,6 +141,14 @@ export function PEWizardPage() {
         ]}
         className="mb-4"
       />
+
+      <DemoRoleSwitcher />
+
+      {!canEdit && (
+        <p className="mb-3 rounded-md border border-amber-300/60 bg-amber-50 px-3 py-2 text-xs text-amber-950">
+          {peBlock}
+        </p>
+      )}
 
       <div className="mb-6">
         <h1 className="text-2xl font-semibold tracking-tight text-[#0B3A6E]">
@@ -405,13 +427,16 @@ export function PEWizardPage() {
         <div className="flex flex-wrap gap-2">
           {step < 5 ? (
             <>
-              <Button
-                variant="secondary"
-                icon={<Save className="h-4 w-4" />}
-                onClick={() => handleSave(false)}
-              >
-                Save draft
-              </Button>
+              <RoleGate blocked={!canEdit} reason={peBlock}>
+                <Button
+                  variant="secondary"
+                  icon={<Save className="h-4 w-4" />}
+                  disabled={!canEdit}
+                  onClick={() => handleSave(false)}
+                >
+                  Save draft
+                </Button>
+              </RoleGate>
               <Button
                 variant="primary"
                 icon={<ArrowRight className="h-4 w-4" />}
@@ -452,19 +477,25 @@ export function PEWizardPage() {
               >
                 Abstract CSV
               </Button>
-              <Button
-                variant="secondary"
-                icon={<Save className="h-4 w-4" />}
-                onClick={() => handleSave(false)}
-              >
-                Save PE
-              </Button>
-              <Button
-                variant="primary"
-                onClick={() => handleSave(true)}
-              >
-                Save & open register
-              </Button>
+              <RoleGate blocked={!canEdit} reason={peBlock}>
+                <Button
+                  variant="secondary"
+                  icon={<Save className="h-4 w-4" />}
+                  disabled={!canEdit}
+                  onClick={() => handleSave(false)}
+                >
+                  Save PE
+                </Button>
+              </RoleGate>
+              <RoleGate blocked={!canEdit} reason={peBlock}>
+                <Button
+                  variant="primary"
+                  disabled={!canEdit}
+                  onClick={() => handleSave(true)}
+                >
+                  Save & open register
+                </Button>
+              </RoleGate>
             </>
           )}
         </div>
