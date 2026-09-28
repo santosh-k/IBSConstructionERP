@@ -51,6 +51,9 @@ export {
 export {
   loadDemoWingRole,
   saveDemoWingRole,
+  getEffectiveWingRole,
+  resolveAuthWingRole,
+  isDemoWingOverrideEnabled,
   canAdvanceFromStage,
   advanceBlockedReason,
   canCreateOrEditPE,
@@ -62,6 +65,8 @@ export {
   DEMO_ROLE_LABELS,
   DEMO_ROLE_BANNER,
   DEMO_WING_STORAGE_KEY,
+  DEMO_WING_OVERRIDE_KEY,
 } from './demoRoles';
 export type { DemoWingRole } from './demoRoles';
 export { DemoRoleSwitcher, useDemoWingRole, RoleGate } from './DemoRoleSwitcher';
+export type { UseDemoWingRoleResult } from './DemoRoleSwitcher';
