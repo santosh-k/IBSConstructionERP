@@ -3,7 +3,7 @@
  * Engineer wing: pick DSR catalog items, enter qty, Abstract of Cost rollup,
  * optional NS rate-analysis drawer.
  */
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import {
   ArrowLeft,
@@ -11,9 +11,11 @@ import {
   FilePlus2,
   Plus,
   Printer,
+  RotateCcw,
   Save,
   Search,
   Trash2,
+  Upload,
   X,
 } from 'lucide-react';
 import { Badge, Breadcrumb, Button, Card } from '@/shared/ui';
@@ -22,7 +24,17 @@ import type { DEEditorState, DELine, DSRItem, NSRateAnalysis } from './types';
 import { ESTIMATE_STAGE_LABELS } from './types';
 import { computeDEAbstract, lineAmount, nsRateFromAnalysis } from './deCompute';
 import { formatInr } from './peCompute';
-import { DSR_CATALOG_BANNER, DSR_CATALOG, searchDSR } from './demoDSR';
+import { searchDSR } from './demoDSR';
+import {
+  clearImportedDsrCatalog,
+  DSR_CATALOG_CHANGE_EVENT,
+  formatDsrCatalogBanner,
+  getActiveDsrCatalog,
+  getDsrCatalogMeta,
+  importDsrCatalogFile,
+  isUsingSampleDsrSeed,
+  type DsrCatalogMeta,
+} from './dsrCatalogStore';
 import {
   createEmptyDE,
   getEstimateById,
@@ -37,7 +49,12 @@ import {
   printSOQ,
 } from './estimateExport';
 import { queueSyncEstimateToBoq, syncEstimateToBoq } from './estimateApiSync';
-import { canCreateOrEditDE, deEditBlockedReason } from './demoRoles';
+import {
+  canCreateOrEditDE,
+  canImportDsrCatalog,
+  deEditBlockedReason,
+  dsrImportBlockedReason,
+} from './demoRoles';
 import { DemoRoleSwitcher, RoleGate, useDemoWingRole } from './DemoRoleSwitcher';
 
 const inputClass =
@@ -84,6 +101,13 @@ export function DEEditorPage() {
   const [dsrCategory, setDsrCategory] = useState<DSRItem['category'] | 'all'>('all');
   const [nsLineId, setNsLineId] = useState<string | null>(null);
   const [showPickerCatalog, setShowPickerCatalog] = useState(true);
+  const [dsrMeta, setDsrMeta] = useState<DsrCatalogMeta>(() => getDsrCatalogMeta());
+  const [dsrCatalog, setDsrCatalog] = useState<readonly DSRItem[]>(() => getActiveDsrCatalog());
+  const [dsrImporting, setDsrImporting] = useState(false);
+  const dsrFileInputRef = useRef<HTMLInputElement>(null);
+  const canImportDsr = canImportDsrCatalog(demoRole);
+  const dsrImportBlock = dsrImportBlockedReason(demoRole);
+
 
   useEffect(() => {
     if (!isPicker && estimateId) {
@@ -91,13 +115,85 @@ export function DEEditorPage() {
     }
   }, [estimateId, isPicker]);
 
+  useEffect(() => {
+    const refresh = () => {
+      setDsrMeta(getDsrCatalogMeta());
+      setDsrCatalog(getActiveDsrCatalog());
+    };
+    refresh();
+    window.addEventListener(DSR_CATALOG_CHANGE_EVENT, refresh);
+    window.addEventListener('storage', refresh);
+    return () => {
+      window.removeEventListener(DSR_CATALOG_CHANGE_EVENT, refresh);
+      window.removeEventListener('storage', refresh);
+    };
+  }, []);
+
   const abstract = useMemo(() => computeDEAbstract(state), [state]);
   const nsLine = state.lines.find((l) => l.id === nsLineId) ?? null;
 
   const filteredDsr = useMemo(
     () => searchDSR(dsrSearch, dsrCategory),
-    [dsrSearch, dsrCategory],
+    [dsrSearch, dsrCategory, dsrCatalog],
   );
+
+  const dsrBanner = useMemo(() => formatDsrCatalogBanner(dsrMeta), [dsrMeta]);
+
+  const handleDsrFileSelected = async (file: File | null) => {
+    if (!file) return;
+    if (!canImportDsr) {
+      addToast({
+        type: 'warning',
+        title: 'DSR import blocked (demo role)',
+        message: dsrImportBlock ?? '',
+      });
+      return;
+    }
+    setDsrImporting(true);
+    try {
+      const { meta, parse } = await importDsrCatalogFile(file);
+      setDsrMeta(meta);
+      setDsrCatalog(getActiveDsrCatalog());
+      const warn =
+        parse.warnings.length > 0
+          ? ` · ${parse.warnings.length} warning(s)`
+          : '';
+      addToast({
+        type: 'success',
+        title: 'DSR catalog imported',
+        message: `${meta.filename} · ${meta.itemCount} items${warn}`,
+      });
+    } catch (err) {
+      addToast({
+        type: 'error',
+        title: 'DSR import failed',
+        message: err instanceof Error ? err.message : String(err),
+      });
+    } finally {
+      setDsrImporting(false);
+      if (dsrFileInputRef.current) dsrFileInputRef.current.value = '';
+    }
+  };
+
+  const handleResetDsrSeed = () => {
+    if (!canImportDsr) {
+      addToast({
+        type: 'warning',
+        title: 'Reset blocked (demo role)',
+        message: dsrImportBlock ?? '',
+      });
+      return;
+    }
+    const meta = clearImportedDsrCatalog();
+    setDsrMeta(meta);
+    setDsrCatalog(getActiveDsrCatalog());
+    addToast({
+      type: 'info',
+      title: 'Sample DSR seed restored',
+      message: `${meta.itemCount} sample items active`,
+    });
+  };
+
 
   const registerForPicker = useMemo(() => {
     if (!isPicker) return [];
@@ -435,9 +531,72 @@ export function DEEditorPage() {
         </div>
       </div>
 
-      <p className="mb-4 rounded-md border border-[var(--pwd-accent,#E87722)]/30 bg-[var(--pwd-accent-subtle,#fef3e8)] px-3 py-2 text-xs text-[#0B3A6E]">
-        {DSR_CATALOG_BANNER}
-      </p>
+      <div className="mb-4 space-y-2">
+        <p
+          className={
+            isUsingSampleDsrSeed()
+              ? 'rounded-md border border-[var(--pwd-accent,#E87722)]/30 bg-[var(--pwd-accent-subtle,#fef3e8)] px-3 py-2 text-xs text-[#0B3A6E]'
+              : 'rounded-md border border-emerald-300/50 bg-emerald-50 px-3 py-2 text-xs text-emerald-950'
+          }
+        >
+          <span className="font-semibold">
+            {dsrMeta.source === 'sample_seed' ? 'Sample seed' : 'Imported schedule'}
+            {' · '}
+          </span>
+          {dsrBanner}
+        </p>
+        <div className="flex flex-wrap items-center gap-2">
+          <input
+            ref={dsrFileInputRef}
+            type="file"
+            accept=".csv,.xlsx,.xls,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel"
+            className="hidden"
+            onChange={(e) => {
+              void handleDsrFileSelected(e.target.files?.[0] ?? null);
+            }}
+          />
+          <RoleGate blocked={!canImportDsr} reason={dsrImportBlock}>
+            <Button
+              variant="secondary"
+              size="sm"
+              icon={<Upload className="h-3.5 w-3.5" />}
+              disabled={!canImportDsr || dsrImporting}
+              onClick={() => {
+                if (!canImportDsr) {
+                  addToast({
+                    type: 'warning',
+                    title: 'DSR import blocked',
+                    message: dsrImportBlock ?? '',
+                  });
+                  return;
+                }
+                dsrFileInputRef.current?.click();
+              }}
+            >
+              {dsrImporting ? 'Importing…' : 'Import DSR (CSV / Excel)'}
+            </Button>
+          </RoleGate>
+          {dsrMeta.source === 'imported' && (
+            <RoleGate blocked={!canImportDsr} reason={dsrImportBlock}>
+              <Button
+                variant="ghost"
+                size="sm"
+                icon={<RotateCcw className="h-3.5 w-3.5" />}
+                disabled={!canImportDsr}
+                onClick={handleResetDsrSeed}
+              >
+                Restore sample seed
+              </Button>
+            </RoleGate>
+          )}
+          <span className="text-2xs text-content-tertiary">
+            {dsrCatalog.length} items in picker
+            {canImportDsr
+              ? ' · Engineer can replace with official file'
+              : ' · Planning: view rates; Engineer imports'}
+          </span>
+        </div>
+      </div>
 
       <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_320px]">
         <div className="space-y-5 min-w-0">
@@ -494,7 +653,7 @@ export function DEEditorPage() {
                 <div className="max-h-56 overflow-y-auto">
                   {filteredDsr.length === 0 ? (
                     <p className="px-4 py-6 text-center text-sm text-content-tertiary">
-                      No DSR items match ({DSR_CATALOG.length} in catalog).
+                      No DSR items match ({dsrCatalog.length} in catalog).
                     </p>
                   ) : (
                     <ul className="divide-y divide-border/60">
@@ -719,8 +878,8 @@ export function DEEditorPage() {
               </table>
               <p className="text-2xs text-content-tertiary leading-relaxed">
                 GST is informational for works contracts and is not added into
-                the DE amount shown on the register. Rates are from Sample
-                CPWD/Delhi DSR seed — not for tender award.
+                the DE amount shown on the register. Rates follow the active DSR
+                catalog ({dsrMeta.source === 'sample_seed' ? 'sample seed' : dsrMeta.filename ?? 'imported'}) — not for tender award without official schedule.
               </p>
               <div className="flex flex-col gap-2 pt-1">
                 <Button

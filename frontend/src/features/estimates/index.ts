@@ -23,7 +23,21 @@ export {
   searchDSR,
   DEMO_DSR_CATALOG,
   DEMO_DSR_BANNER,
+  getActiveDsrCatalog,
+  getDsrCatalogMeta,
+  getDsrCatalogBanner,
+  formatDsrCatalogBanner,
 } from './demoDSR';
+export {
+  importDsrCatalogFile,
+  clearImportedDsrCatalog,
+  saveImportedDsrCatalog,
+  isUsingSampleDsrSeed,
+  DSR_CATALOG_STORAGE_KEY,
+  DSR_CATALOG_CHANGE_EVENT,
+} from './dsrCatalogStore';
+export type { DsrCatalogMeta, DsrCatalogSourceKind } from './dsrCatalogStore';
+export { parseDsrCatalogFile, parseDsrCsvText } from './dsrCatalogParse';
 export {
   nextStage,
   advanceRoleHint,
@@ -60,6 +74,8 @@ export {
   peEditBlockedReason,
   canCreateOrEditDE,
   deEditBlockedReason,
+  canImportDsrCatalog,
+  dsrImportBlockedReason,
   canEditAaEsNote,
   canEditTsSanctionNotes,
   DEMO_ROLE_LABELS,

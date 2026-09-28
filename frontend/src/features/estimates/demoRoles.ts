@@ -150,6 +150,16 @@ export function deEditBlockedReason(role: DemoWingRole): string | null {
   return 'DE deep-edit / DSR pick is an Engineer affordance. Login as Engineer · डीई संपादन अभियंता भूमिका के लिए है';
 }
 
+/** Engineer (demo) may import/replace Delhi DSR CSV or Excel; Planning may view rates only. */
+export function canImportDsrCatalog(role: DemoWingRole): boolean {
+  return role === 'engineer';
+}
+
+export function dsrImportBlockedReason(role: DemoWingRole): string | null {
+  if (canImportDsrCatalog(role)) return null;
+  return 'DSR catalog import is an Engineer affordance. Login as Engineer · डीएसआर आयात अभियंता भूमिका के लिए है';
+}
+
 /** Both wings may view Abstract / SOQ exports. */
 export function canExportAbstractSoq(_role: DemoWingRole): boolean {
   return true;

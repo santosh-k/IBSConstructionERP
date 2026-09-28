@@ -18,4 +18,7 @@ rate_packs:
       Source label: Sample CPWD/Delhi DSR seed — replace with official PWD Delhi
       schedule when provided; not for tender award. Not an official GNCTD / PWD
       Delhi / CPWD publication. Frontend DE editor loads the same seed via
-      frontend/src/features/estimates/data/.
+      frontend/src/features/estimates/data/. Officers (Engineer wing) can import
+      CSV or Excel (.xlsx) from the DE page; imported catalog persists in
+      browser localStorage (pwd_delhi_dsr_catalog_v1) for MVP — not a server
+      upload. Legacy .xls: convert to .xlsx/CSV first.
